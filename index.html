@@ -75,9 +75,22 @@ h2 { font-size: 22px; text-transform: uppercase; }
 .ballmark::before, .ballmark::after { content: ""; position: absolute; border: 2px solid var(--ball-ink); border-radius: 50%; opacity: .55; }
 .ballmark::before { width: 34px; height: 34px; left: -18px; top: -2px; }
 .ballmark::after { width: 34px; height: 34px; right: -18px; top: 6px; }
-.tabs { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
-.tabs button { border: 0; background: none; color: var(--muted); font: 600 14px var(--body); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.tabs { display: flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tabs button { flex: 1; border: 0; background: none; color: var(--muted); font: 600 15px var(--body); padding: 8px 10px; border-radius: 999px; cursor: pointer; }
 .tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.tabs button:disabled { opacity: .4; cursor: default; }
+.mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mode button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 10px; font: 600 15px var(--body); cursor: pointer; min-height: 44px; }
+.mode button[aria-pressed="true"] { background: var(--court); border-color: var(--court); color: var(--court-ink); }
+.tablewrap { overflow-x: auto; }
+table.pts { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.pts th { text-align: right; font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.pts td { text-align: right; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+table.pts th:nth-child(2), table.pts td:nth-child(2) { text-align: left; width: 100%; }
+table.pts td:first-child { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--muted); }
+table.pts td.big { font-family: var(--display); font-weight: 700; font-size: 20px; }
+table.pts tr:first-child td:first-child { color: var(--ball-ink); }
+table.pts tbody tr:first-child td:first-child span { background: var(--ball); border-radius: 6px; padding: 0 6px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .counter { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .count { font-family: var(--display); font-weight: 700; font-size: 64px; line-height: .85; font-variant-numeric: tabular-nums; }
@@ -202,16 +215,25 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   // Ordem dos jogos por quantidade de times. Lados: {t: time}, {w: vencedor do jogo}, {l: perdedor do jogo}
   var FORMATO = {
     2: [["g1", { t: 0 }, { t: 1 }]],
-    3: [["g1", { t: 0 }, { t: 1 }], ["g2", { t: 2 }, { l: "g1" }], ["g3", { t: 2 }, { w: "g1" }]],
+    3: [["g1", { t: 0 }, { t: 1 }], ["g2", { w: "g1" }, { t: 2 }], ["g3", { l: "g1" }, { t: 2 }]],
     4: [["g1", { t: 0 }, { t: 1 }], ["g2", { t: 2 }, { t: 3 }], ["g3", { w: "g1" }, { w: "g2" }], ["g4", { l: "g1" }, { l: "g2" }]]
   };
   var ROTULO = { g1: "Jogo 1", g2: "Jogo 2", g3: "Jogo 3", g4: "Jogo 4" };
+  // Pontos por colocação. Rodada com 3 times não pontua.
+  var PONTOS = { 2: [3, 0], 4: [3, 2, 1, 0] };
+  // Pesos do sorteio
+  var PESO_REPETICAO = 1, PESO_ESPERA = 1.5, PESO_EQUILIBRIO = 25;
 
-  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false }; }
+  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "rank" }; }
   function carregar() {
     try {
       var r = JSON.parse(localStorage.getItem(KEY));
-      if (r && Array.isArray(r.names)) { var d = padrao(); for (var k in d) if (r[k] !== undefined) d[k] = r[k]; return d; }
+      if (r && Array.isArray(r.names)) {
+        var d = padrao();
+        for (var k in d) if (r[k] !== undefined) d[k] = r[k];
+        d.rounds.forEach(function (x) { if (x.closed === undefined) x.closed = !!x.ranking; });
+        return d;
+      }
     } catch (e) {}
     return padrao();
   }
@@ -228,9 +250,11 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function pk(a, b) { a = chave(a); b = chave(b); return a < b ? a + "|" + b : b + "|" + a; }
   function media(a) { if (!a.length) return 0; var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
   function embaralhar(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function pessoas(time) { return [].concat.apply([], time); }
   function ultima() { return S.rounds.length ? S.rounds[S.rounds.length - 1] : null; }
-  function pendente() { var r = ultima(); return r && !r.ranking ? r : null; }
+  function pendente() { var r = ultima(); return r && !r.closed ? r : null; }
   function nomeUnidade(u) { return u.join(" / "); }
+  function plural(n, um, varios) { return n + " " + (n === 1 ? um : varios); }
 
   // ---------- estrutura da lista ----------
   function duplasNecessarias() { return Math.max(0, S.names.length - MAX); }
@@ -243,11 +267,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     a[t - 1] = v - 4 * (t - 1);
     return a;
   }
-  function prontoParaSortear() {
-    var n = S.names.length;
-    if (n < 4) return false;
-    return S.pairs.length === duplasNecessarias();
-  }
+  function prontoParaSortear() { return S.names.length >= 4 && S.pairs.length === duplasNecessarias(); }
   function unidades() {
     var emDupla = {};
     S.pairs.forEach(function (p) { emDupla[chave(p[0])] = 1; emDupla[chave(p[1])] = 1; });
@@ -263,48 +283,60 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     rs.forEach(function (r, k) {
       var w = Math.pow(0.6, k);
       r.teams.forEach(function (time) {
-        var p = [].concat.apply([], time);
+        var p = pessoas(time);
         for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) { var c = pk(p[i], p[j]); m[c] = (m[c] || 0) + w; }
       });
     });
     return m;
   }
-  // Nível de cada pessoa a partir das colocações recentes (0 = sempre último, 1 = sempre campeão).
-  function niveis() {
-    var soma = {}, peso = {};
-    var rs = S.rounds.filter(function (r) { return r.ranking; }).slice(-10).reverse();
-    rs.forEach(function (r, k) {
-      var w = Math.pow(0.8, k), T = r.teams.length;
-      r.ranking.forEach(function (ti, pos) {
-        var pts = T > 1 ? (T - 1 - pos) / (T - 1) : 0.5;
-        [].concat.apply([], r.teams[ti]).forEach(function (n) {
-          var c = chave(n); soma[c] = (soma[c] || 0) + w * pts; peso[c] = (peso[c] || 0) + w;
-        });
-      });
-    });
-    return function (n) { var c = chave(n); return ((soma[c] || 0) + 0.5) / ((peso[c] || 0) + 1); };
+  // Média de pontos por rodada, puxada para a média geral (1,5) enquanto a pessoa tem poucas rodadas.
+  function nivel(n) {
+    var s = S.scores[chave(n)];
+    var pts = s ? s.pts : 0, rod = s ? s.rounds : 0;
+    return (pts + 1.5 * 2) / (rod + 2) / 3;
   }
-  function custo(times, pw, nv) {
-    var rep = 0, ms = [];
-    times.forEach(function (t) {
-      var p = [].concat.apply([], t);
-      for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) rep += pw[pk(p[i], p[j])] || 0;
-      ms.push(media(p.map(nv)));
+  // Quantos jogos cada pessoa já está parada no fim da rodada anterior.
+  function esperaNoFim(r) {
+    var out = {};
+    if (!r || !r.closed) return out;
+    var defs = FORMATO[r.teams.length], ultimoJogo = {}, ok = true;
+    defs.forEach(function (d, i) {
+      var l = lados(r, d[0]);
+      if (l[0] === null || l[1] === null) { ok = false; return; }
+      l.forEach(function (ti) { pessoas(r.teams[ti]).forEach(function (n) { ultimoJogo[chave(n)] = i; }); });
     });
-    var g = media(ms), bal = media(ms.map(function (m) { return (m - g) * (m - g); }));
-    return rep + 25 * bal;
+    if (!ok) return out;
+    for (var k in ultimoJogo) out[k] = defs.length - 1 - ultimoJogo[k];
+    return out;
+  }
+  function avaliar(times, pw, esp, equilibrar) {
+    var rep = 0, ms = [], longa = 0;
+    times.forEach(function (t, ti) {
+      var p = pessoas(t);
+      for (var i = 0; i < p.length; i++) {
+        for (var j = i + 1; j < p.length; j++) rep += pw[pk(p[i], p[j])] || 0;
+        // Times 1 e 2 jogam o primeiro jogo. Quem cai nos outros espera pelo menos mais um jogo.
+        if (ti >= 2 && (esp[chave(p[i])] || 0) >= 1) longa += esp[chave(p[i])];
+      }
+      if (equilibrar) ms.push(media(p.map(nivel)));
+    });
+    var bal = 0;
+    if (equilibrar) { var g = media(ms); bal = media(ms.map(function (m) { return (m - g) * (m - g); })); }
+    return PESO_REPETICAO * rep + PESO_ESPERA * longa + PESO_EQUILIBRIO * bal;
   }
   function sortear() {
-    var us = unidades(), tam = tamanhos(us.length), pw = pesosDeParceria(), nv = niveis();
-    var melhor = null, melhorCusto = Infinity;
-    for (var it = 0; it < 4000; it++) {
+    var us = unidades(), tam = tamanhos(us.length), pw = pesosDeParceria(), antes = ultima(), esp = esperaNoFim(antes);
+    var equilibrar = S.mode === "rank", melhor = null, melhorCusto = Infinity;
+    for (var it = 0; it < 5000; it++) {
       var s = embaralhar(us.slice()), times = [], k = 0;
       tam.forEach(function (n) { times.push(s.slice(k, k + n)); k += n; });
-      var c = custo(times, pw, nv);
+      var c = avaliar(times, pw, esp, equilibrar);
       if (c < melhorCusto) { melhorCusto = c; melhor = times; }
     }
-    var antes = ultima();
-    var r = { id: Date.now(), date: new Date().toISOString(), teams: melhor, winners: {}, ranking: null, repeats: repetidos(melhor, antes) };
+    var r = {
+      id: Date.now(), date: new Date().toISOString(), teams: melhor, winners: {}, ranking: null, closed: false,
+      mode: S.mode, repeats: repetidos(melhor, antes), longWait: esperaLonga(melhor, esp)
+    };
     S.rounds.push(r);
     if (S.rounds.length > 40) S.rounds = S.rounds.slice(-40);
     S.fromLast = false;
@@ -314,10 +346,10 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function repetidos(times, antes) {
     if (!antes) return null;
     var juntos = {};
-    antes.teams.forEach(function (t) { var p = [].concat.apply([], t); for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) juntos[pk(p[i], p[j])] = 1; });
+    antes.teams.forEach(function (t) { var p = pessoas(t); for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) juntos[pk(p[i], p[j])] = 1; });
     var n = 0;
     times.forEach(function (t) {
-      var p = [].concat.apply([], t);
+      var p = pessoas(t);
       for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) {
         if (juntos[pk(p[i], p[j])] && !mesmaDupla(t, p[i], p[j])) n++;
       }
@@ -325,8 +357,14 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     return n;
   }
   function mesmaDupla(time, a, b) { return time.some(function (u) { return u.length === 2 && u.indexOf(a) >= 0 && u.indexOf(b) >= 0; }); }
+  function esperaLonga(times, esp) {
+    if (!Object.keys(esp).length) return null;
+    var n = 0;
+    times.forEach(function (t, ti) { if (ti >= 2) pessoas(t).forEach(function (p) { if ((esp[chave(p)] || 0) >= 1) n++; }); });
+    return n;
+  }
 
-  // ---------- jogos e ranking ----------
+  // ---------- jogos, ranking e pontos ----------
   function lados(r, g) {
     var d = FORMATO[r.teams.length].filter(function (x) { return x[0] === g; })[0];
     return [resolver(r, d[1]), resolver(r, d[2])];
@@ -347,31 +385,40 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       if (l[0] === null || l[1] === null || l.indexOf(v) < 0) delete r.winners[g];
     });
   }
+  function pontua(r) { return !!PONTOS[r.teams.length]; }
   function rankingAutomatico(r) {
     var T = r.teams.length, w = r.winners;
     function perd(g) { var l = lados(r, g); return l[0] === w[g] ? l[1] : l[0]; }
     if (T === 2) return w.g1 !== undefined ? [w.g1, perd("g1")] : null;
     if (T === 4) return w.g3 !== undefined && w.g4 !== undefined ? [w.g3, perd("g3"), w.g4, perd("g4")] : null;
-    if (w.g1 === undefined || w.g2 === undefined || w.g3 === undefined) return null;
-    var v = [0, 0, 0];
-    ["g1", "g2", "g3"].forEach(function (g) { v[w[g]]++; });
-    var ord = [0, 1, 2].sort(function (a, b) { return v[b] - v[a]; });
-    if (v[ord[0]] === v[ord[1]] || v[ord[1]] === v[ord[2]]) return "empate";
-    return ord;
+    return null;
   }
+  function aplicarPontos(r, sinal) {
+    if (!r.ranking || !pontua(r)) return;
+    var tab = PONTOS[r.teams.length];
+    r.ranking.forEach(function (ti, pos) {
+      pessoas(r.teams[ti]).forEach(function (n) {
+        var k = chave(n), s = S.scores[k] || (S.scores[k] = { name: n, pts: 0, rounds: 0 });
+        s.name = n; s.pts += sinal * tab[pos]; s.rounds += sinal;
+        if (s.rounds <= 0) delete S.scores[k];
+      });
+    });
+  }
+  function fecharComRanking(r, ordem) { r.ranking = ordem; r.closed = true; aplicarPontos(r, 1); salvar(); }
+  function reabrir(r) { aplicarPontos(r, -1); r.ranking = null; r.closed = false; salvar(); }
 
   // ---------- render ----------
   var app = document.getElementById("app"), layer = document.getElementById("layer");
 
   function render() {
     var r = ultima(), h = "";
-    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"></span><h1>Sorteio do Vôlei</h1></div>';
-    if (r) {
-      h += '<nav class="tabs" aria-label="Telas"><button data-a="view" data-v="list" aria-pressed="' + (ui.view === "list") + '">Lista</button>' +
-        '<button data-a="view" data-v="round" aria-pressed="' + (ui.view === "round") + '">Rodada</button></nav>';
-    }
-    h += "</header>";
-    h += ui.view === "round" && r ? telaRodada(r) : telaLista();
+    if (ui.view === "round" && !r) ui.view = "list";
+    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"></span><h1>Sorteio do Vôlei</h1></div></header>';
+    h += '<nav class="tabs" aria-label="Telas">' +
+      '<button data-a="view" data-v="list" aria-pressed="' + (ui.view === "list") + '">Lista</button>' +
+      '<button data-a="view" data-v="round" aria-pressed="' + (ui.view === "round") + '"' + (r ? "" : " disabled") + ">Rodada</button>" +
+      '<button data-a="view" data-v="pts" aria-pressed="' + (ui.view === "pts") + '">Pontos</button></nav>';
+    h += ui.view === "round" ? telaRodada(r) : ui.view === "pts" ? telaPontos() : telaLista();
     app.innerHTML = h;
     renderSheet();
   }
@@ -382,7 +429,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     h += '<div class="counter"><div class="count">' + n + "<small>" + (n === 1 ? "nome" : "nomes") + "</small></div>";
     if (tam.length) {
       h += '<div class="shape"><b>' + tam.length + " times</b>";
-      if (need > 0 && S.pairs.length === need) h += "com " + need + (need === 1 ? " dupla" : " duplas") + " revezando";
+      if (need > 0 && S.pairs.length === need) h += "com " + plural(need, "dupla", "duplas") + " revezando";
       h += '<div class="sizes">' + tam.map(function (t) { return '<span class="' + (t < 4 ? "short" : "") + '">' + t + "</span>"; }).join("") + "</div></div>";
     } else {
       h += '<div class="shape">Mínimo de 4 nomes</div>';
@@ -405,9 +452,15 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (need > 0 || S.pairs.length) h += painelDuplas(need);
 
     if (pendente()) {
-      h += '<div class="notice">A rodada atual ainda não tem ranking. Registre o resultado dos jogos antes de sortear de novo.</div>';
+      h += '<div class="notice">A rodada atual ainda não foi encerrada. Registre os jogos antes de sortear de novo.</div>';
       h += '<button class="btn primary block" data-a="view" data-v="round">Ver rodada atual</button>';
     } else {
+      h += '<section class="panel" aria-label="Tipo de sorteio"><div class="mode">' +
+        '<button data-a="mode" data-v="rank" aria-pressed="' + (S.mode === "rank") + '">Pelos pontos</button>' +
+        '<button data-a="mode" data-v="random" aria-pressed="' + (S.mode === "random") + '">Aleatório</button></div>' +
+        '<p class="hint">' + (S.mode === "rank"
+          ? "Espalha quem tem média de pontos alta para os times ficarem equilibrados."
+          : "Ignora os pontos.") + " Nos dois casos evita repetir parceiros e deixar alguém muito tempo parado entre uma rodada e outra.</p></section>";
       h += '<button class="btn ball block" data-a="ask" data-s="draw"' + (prontoParaSortear() ? "" : " disabled") + ">Sortear times</button>";
     }
     h += historico();
@@ -418,7 +471,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var h = '<section class="alert" aria-label="Duplas de revezamento">';
     if (need > 0) {
       h += "<strong>" + S.names.length + " nomes: " + need + " acima do limite</strong>";
-      h += "<span>O máximo é " + MAX + ". Forme " + need + (need === 1 ? " dupla" : " duplas") + " de revezamento. Cada dupla ocupa uma vaga e entra no time como \"nome1 / nome2\".</span>";
+      h += "<span>O máximo é " + MAX + ". Forme " + plural(need, "dupla", "duplas") + " de revezamento. Cada dupla ocupa uma vaga e entra no time como \"nome1 / nome2\".</span>";
     } else {
       h += "<strong>Duplas sobrando</strong><span>Com " + MAX + " nomes ou menos não precisa de revezamento.</span>";
     }
@@ -428,11 +481,9 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       }).join("") + "</div>";
     }
     if (S.pairs.length > need) {
-      var sobra = S.pairs.length - need;
-      h += "<span>Desfaça " + sobra + (sobra === 1 ? " dupla." : " duplas.") + "</span>";
+      h += "<span>Desfaça " + plural(S.pairs.length - need, "dupla.", "duplas.") + "</span>";
     } else if (S.pairs.length < need) {
-      var falta = need - S.pairs.length;
-      h += "<span>Faltam " + falta + (falta === 1 ? " dupla" : " duplas") + ". Toque em dois nomes para juntar.</span>";
+      h += "<span>Faltam " + plural(need - S.pairs.length, "dupla", "duplas") + ". Toque em dois nomes para juntar.</span>";
       var emDupla = {};
       S.pairs.forEach(function (p) { emDupla[chave(p[0])] = 1; emDupla[chave(p[1])] = 1; });
       h += '<div class="chips">' + S.names.filter(function (nm) { return !emDupla[chave(nm)]; }).map(function (nm) {
@@ -449,7 +500,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     t.forEach(function (u) { h += '<li class="' + (u.length > 1 ? "duo" : "") + '">' + esc(nomeUnidade(u)) + "</li>"; });
     h += "</ol>";
     var maior = Math.max.apply(null, r.teams.map(function (x) { return x.length; }));
-    if (t.length < maior) h += '<span class="tag">' + (t.length === 1 ? "1 jogador" : t.length + " jogadores") + ", completa no par ou ímpar</span>";
+    if (t.length < maior) h += '<span class="tag">' + plural(t.length, "jogador", "jogadores") + ", completa no par ou ímpar</span>";
     return h + "</article>";
   }
   function resumoTime(r, i) { return r.teams[i].map(function (u) { return u[0].split(" ")[0] + (u.length > 1 ? "/" + u[1].split(" ")[0] : ""); }).join(", "); }
@@ -458,14 +509,16 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var h = "", T = r.teams.length, quando = new Date(r.date);
     h += '<div class="meta"><span>' + quando.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }) + " às " +
       quando.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + "</span>";
-    if (r.repeats !== null && r.repeats !== undefined) h += "<span>" + (r.repeats === 0 ? "Nenhum parceiro repetido da rodada anterior" : r.repeats + (r.repeats === 1 ? " parceria repetida" : " parcerias repetidas") + " da rodada anterior") + "</span>";
+    h += "<span>" + (r.mode === "random" ? "Aleatório" : "Pelos pontos") + "</span>";
+    if (r.repeats !== null && r.repeats !== undefined) h += "<span>" + (r.repeats === 0 ? "Nenhuma parceria repetida" : plural(r.repeats, "parceria repetida", "parcerias repetidas")) + "</span>";
+    if (r.longWait !== null && r.longWait !== undefined) h += "<span>" + (r.longWait === 0 ? "Ninguém parado 2 jogos" : plural(r.longWait, "pessoa parada", "pessoas paradas") + " 2 jogos") + "</span>";
     h += "</div>";
     h += '<section class="teams" aria-label="Times">';
     for (var i = 0; i < T; i++) h += blocoTime(r, i);
     h += "</section>";
 
     h += '<h2>Jogos</h2><section class="games">';
-    var agoraMarcado = false, travado = !!r.ranking;
+    var agoraMarcado = false, travado = r.closed;
     FORMATO[T].forEach(function (d) {
       var g = d[0], l = lados(r, g), v = r.winners[g], pronto = l[0] !== null && l[1] !== null;
       var agora = pronto && v === undefined && !agoraMarcado && !travado;
@@ -475,9 +528,9 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       h += '<div class="vs">' + lado(r, g, l[0], d[1], v, travado) + '<span class="x">x</span>' + lado(r, g, l[1], d[2], v, travado) + "</div></div>";
     });
     h += "</section>";
-    if (!travado && T > 1) h += '<p class="hint">Toque no time que venceu. Se errar, toque no outro para corrigir.</p>';
+    if (!travado) h += '<p class="hint">Toque no time que venceu. Se errar, toque no outro para corrigir.</p>';
 
-    h += secaoRanking(r);
+    h += pontua(r) ? secaoRanking(r) : secaoTresTimes(r);
     return h;
   }
 
@@ -492,16 +545,32 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
 
   function listaRanking(r, ordem) {
+    var tab = PONTOS[r.teams.length];
     return '<div class="rank">' + ordem.map(function (ti, p) {
-      return '<div class="rank-row"><span class="pos">' + (p + 1) + 'º</span><span class="who"><b>Time ' + (ti + 1) + "</b>" + esc(resumoTime(r, ti)) + "</span></div>";
+      return '<div class="rank-row"><span class="pos">' + (p + 1) + 'º</span><span class="who"><b>Time ' + (ti + 1) + " · +" + tab[p] + " pts</b>" + esc(resumoTime(r, ti)) + "</span></div>";
     }).join("") + "</div>";
+  }
+
+  function secaoTresTimes(r) {
+    var h = '<section class="panel" aria-label="Encerrar rodada"><h2>Encerrar rodada</h2>';
+    if (r.closed) {
+      h += '<p class="hint">Rodada encerrada. Rodadas com 3 times não contam pontos.</p>';
+      h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
+      h += '<button class="btn ghost" data-a="reabrir">Corrigir resultado</button>';
+      return h + "</section>";
+    }
+    h += '<p class="hint">Rodadas com 3 times não contam pontos. Marque pelo menos o vencedor do jogo 1 para o app saber quem jogou por último.</p>';
+    h += '<button class="btn primary block" data-a="fechar3"' + (r.winners.g1 !== undefined ? "" : " disabled") + ">Encerrar rodada</button>";
+    h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
+    return h + "</section>";
   }
 
   function secaoRanking(r) {
     var h = '<section class="panel" aria-label="Ranking"><h2>Ranking final</h2>';
-    if (r.ranking) {
+    if (r.closed) {
       h += listaRanking(r, r.ranking);
       h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
+      h += '<button class="btn ghost" data-a="reabrir">Corrigir resultado</button>';
       return h + "</section>";
     }
     if (ui.manual) {
@@ -519,31 +588,49 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       return h + "</section>";
     }
     var auto = rankingAutomatico(r);
-    if (auto === "empate") {
-      h += '<p class="hint">Cada time venceu um jogo. Desempate pelos pontos e informe a ordem.</p>';
-      h += '<button class="btn primary block" data-a="manual">Informar ordem</button>';
-    } else if (auto) {
+    if (auto) {
       h += listaRanking(r, auto);
       h += '<button class="btn primary block" data-a="rankok">Confirmar ranking</button>';
     } else {
-      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. Ele é pedido antes de cada novo sorteio e ajuda a equilibrar os próximos times.</p>';
+      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. ' +
+        (r.teams.length === 4 ? "1º ganha 3 pontos, 2º ganha 2, 3º ganha 1 e 4º não pontua." : "Quem vence ganha 3 pontos.") + "</p>";
       h += '<button class="btn ghost" data-a="manual">Jogaram em outra ordem? Informar ranking direto</button>';
     }
     h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
     return h + "</section>";
   }
 
+  function telaPontos() {
+    var lista = Object.keys(S.scores).map(function (k) { return S.scores[k]; }).filter(function (s) { return s.rounds > 0; });
+    lista.sort(function (a, b) { return b.pts - a.pts || b.pts / b.rounds - a.pts / a.rounds || a.name.localeCompare(b.name); });
+    var h = '<section class="panel" aria-label="Pontuação"><h2>Pontuação</h2>';
+    h += '<p class="hint">4 times: 1º ganha 3, 2º ganha 2, 3º ganha 1, 4º ganha 0. 2 times: quem vence ganha 3. Rodadas com 3 times não contam. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
+    if (!lista.length) {
+      h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o ranking de uma rodada.</span></div>';
+      return h + "</section>";
+    }
+    h += '<div class="tablewrap"><table class="pts"><thead><tr><th>#</th><th>Nome</th><th>Pts</th><th>Rod.</th><th>Média</th></tr></thead><tbody>';
+    lista.forEach(function (s, i) {
+      h += "<tr><td><span>" + (i + 1) + "</span></td><td>" + esc(s.name) + '</td><td class="big">' + s.pts + "</td><td>" + s.rounds + "</td><td>" +
+        (s.pts / s.rounds).toFixed(1).replace(".", ",") + "</td></tr>";
+    });
+    h += "</tbody></table></div>";
+    h += '<button class="btn danger" data-a="ask" data-s="zeropts">Zerar pontuação</button>';
+    return h + "</section>";
+  }
+
   function historico() {
-    var feitas = S.rounds.filter(function (r) { return r.ranking; });
+    var feitas = S.rounds.filter(function (r) { return r.closed; });
     if (!feitas.length) return "";
     var h = '<details class="hist"><summary>Rodadas anteriores (' + feitas.length + ")</summary>";
     feitas.slice().reverse().slice(0, 12).forEach(function (r) {
       var d = new Date(r.date);
       h += '<div class="hist-item"><span class="when">' + d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + "</span>";
-      r.ranking.forEach(function (ti, p) { h += "<span><b>" + (p + 1) + "º</b> " + esc(r.teams[ti].map(nomeUnidade).join(", ")) + "</span>"; });
+      if (r.ranking) r.ranking.forEach(function (ti, p) { h += "<span><b>" + (p + 1) + "º</b> " + esc(r.teams[ti].map(nomeUnidade).join(", ")) + "</span>"; });
+      else r.teams.forEach(function (t, ti) { h += "<span><b>Time " + (ti + 1) + "</b> " + esc(t.map(nomeUnidade).join(", ")) + "</span>"; });
       h += "</div>";
     });
-    h += '<div class="hist-item"><button class="btn danger" data-a="ask" data-s="reset">Zerar histórico</button><p class="hint">O histórico serve para evitar times repetidos e equilibrar o nível. Zere quando a turma mudar bastante.</p></div>';
+    h += '<div class="hist-item"><button class="btn danger" data-a="ask" data-s="reset">Zerar histórico</button><p class="hint">O histórico serve para evitar parceiros repetidos. Não mexe na pontuação.</p></div>';
     return h + "</details>";
   }
 
@@ -552,18 +639,22 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var h = '<div class="scrim" data-a="close"><div class="sheet" role="dialog" aria-modal="true">';
     if (ui.sheet === "draw") {
       var tam = tamanhos(vagas());
-      h += "<h2>A lista tá certinha?</h2><p>" + S.names.length + " nomes, " + tam.length + " times (" + tam.join(", ") + "). Alguém saiu ou entrou?</p>";
+      h += "<h2>A lista tá certinha?</h2><p>" + S.names.length + " nomes, " + tam.length + " times (" + tam.join(", ") + "), sorteio " +
+        (S.mode === "rank" ? "pelos pontos" : "aleatório") + ". Alguém saiu ou entrou?</p>";
       h += '<div class="chips">' + unidades().map(function (u) { return '<span class="chip' + (u.length > 1 ? " duo" : "") + '" style="padding-right:12px">' + esc(nomeUnidade(u)) + "</span>"; }).join("") + "</div>";
       h += '<div class="row"><button class="btn" data-a="close">Ajustar lista</button><button class="btn ball" data-a="draw">Tá certa, sortear</button></div>';
     } else if (ui.sheet === "cancel") {
       h += "<h2>Descartar sorteio?</h2><p>Os times desta rodada somem e não entram no histórico.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Manter</button><button class="btn danger" data-a="cancel">Descartar</button></div>';
     } else if (ui.sheet === "clear") {
-      h += "<h2>Limpar a lista?</h2><p>Remove os " + S.names.length + " nomes e as duplas. O histórico de rodadas continua.</p>";
+      h += "<h2>Limpar a lista?</h2><p>Remove os " + S.names.length + " nomes e as duplas. Histórico e pontos continuam.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="clear">Limpar</button></div>';
     } else if (ui.sheet === "reset") {
-      h += "<h2>Zerar histórico?</h2><p>Apaga as rodadas e os rankings. Os próximos sorteios não vão mais considerar quem já jogou junto.</p>";
+      h += "<h2>Zerar histórico?</h2><p>Os próximos sorteios não vão mais considerar quem já jogou junto. A pontuação continua.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="reset">Zerar</button></div>';
+    } else if (ui.sheet === "zeropts") {
+      h += "<h2>Zerar pontuação?</h2><p>Todo mundo volta para zero. Não dá para desfazer.</p>";
+      h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="zeropts">Zerar</button></div>';
     }
     layer.innerHTML = h + "</div></div>";
   }
@@ -582,8 +673,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
   function adicionar() {
     var campo = document.getElementById("novo");
-    var bruto = campo ? campo.value : "";
-    var partes = bruto.split(/[\n,;]+/).map(limparNome).filter(Boolean);
+    var partes = (campo ? campo.value : "").split(/[\n,;]+/).map(limparNome).filter(Boolean);
     var repetidosNomes = [], novos = 0;
     partes.forEach(function (p) {
       var existe = S.names.some(function (n) { return chave(n) === chave(p); });
@@ -620,7 +710,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (a === "close" && b.classList.contains("scrim") && e.target !== b) return;
     var r = ultima();
     switch (a) {
-      case "view": ui.view = b.getAttribute("data-v"); break;
+      case "view": ui.view = b.getAttribute("data-v"); window.scrollTo(0, 0); break;
       case "add": adicionar(); return;
       case "del": removerNome(+b.getAttribute("data-i")); return;
       case "exemplo": S.names = EXEMPLO.slice(); S.pairs = []; S.fromLast = false; salvar(); break;
@@ -631,26 +721,30 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         else { S.pairs.push([ui.sel, nm]); ui.sel = null; salvar(); }
         break;
       case "undo": S.pairs.splice(+b.getAttribute("data-i"), 1); salvar(); break;
+      case "mode": S.mode = b.getAttribute("data-v") === "random" ? "random" : "rank"; salvar(); break;
       case "ask": ui.sheet = b.getAttribute("data-s"); break;
       case "close": ui.sheet = null; break;
       case "draw": ui.sheet = null; if (prontoParaSortear() && !pendente()) sortear(); window.scrollTo(0, 0); break;
       case "cancel": ui.sheet = null; if (pendente()) { S.rounds.pop(); salvar(); } ui.view = "list"; ui.manual = null; break;
       case "clear": ui.sheet = null; S.names = []; S.pairs = []; ui.sel = null; S.fromLast = false; salvar(); break;
-      case "reset": ui.sheet = null; S.rounds = S.rounds.filter(function (x) { return !x.ranking; }); salvar(); toast("Histórico zerado"); break;
+      case "reset": ui.sheet = null; S.rounds = S.rounds.filter(function (x) { return !x.closed; }); salvar(); toast("Histórico zerado"); break;
+      case "zeropts": ui.sheet = null; S.scores = {}; salvar(); toast("Pontuação zerada"); break;
       case "win":
-        if (!r || r.ranking) return;
+        if (!r || r.closed) return;
         r.winners[b.getAttribute("data-g")] = +b.getAttribute("data-t");
         limparInvalidos(r); salvar(); break;
       case "rankok":
         var auto = rankingAutomatico(r);
-        if (Array.isArray(auto)) { r.ranking = auto; salvar(); }
+        if (auto && !r.closed) fecharComRanking(r, auto);
         break;
+      case "fechar3": if (r && !r.closed && r.winners.g1 !== undefined) { r.closed = true; salvar(); } break;
+      case "reabrir": if (r && r.closed) reabrir(r); break;
       case "manual": ui.manual = []; break;
       case "mpick": ui.manual.push(+b.getAttribute("data-t")); break;
       case "mreset": ui.manual = []; break;
       case "mcancel": ui.manual = null; break;
       case "mok":
-        if (ui.manual && ui.manual.length === r.teams.length) { r.ranking = ui.manual.slice(); ui.manual = null; salvar(); }
+        if (ui.manual && ui.manual.length === r.teams.length && !r.closed) { fecharComRanking(r, ui.manual.slice()); ui.manual = null; }
         break;
       case "nova": ui.view = "list"; window.scrollTo(0, 0); if (prontoParaSortear()) ui.sheet = "draw"; break;
       default: return;
