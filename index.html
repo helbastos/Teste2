@@ -315,11 +315,11 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     });
     return m;
   }
-  // Média de pontos por rodada, puxada para a média geral (1,5) enquanto a pessoa tem poucas rodadas.
+  // Média de pontos por rodada, puxada para a média geral (1,25) enquanto a pessoa tem poucas rodadas.
   function nivel(n) {
     var s = S.scores[chave(n)];
     var pts = s ? s.pts : 0, rod = s ? s.rounds : 0;
-    return (pts + 1.5 * 2) / (rod + 2) / 3;
+    return (pts + 1.25 * 2) / (rod + 2) / 3;
   }
   // Quantos jogos cada pessoa já está parada no fim da rodada anterior.
   function esperaNoFim(r) {
