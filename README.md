@@ -22,6 +22,9 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
 
 ## Nomes
 
+Quem é adicionado fica salvo na **Galera**: na próxima vez é só tocar no nome (ou em "Adicionar todos"). Quem fica 30 dias sem jogar sai da galera sozinho.
+
+
 Nome repetido não entra. Se dois têm o mesmo primeiro nome, os dois precisam de sobrenome (ex.: João Silva e João Lima).
 
 ## Ordem dos jogos

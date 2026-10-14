@@ -125,6 +125,7 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--court); outline-
 .chip .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 2px; }
 .chip .x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
 .chip.pick { cursor: pointer; padding-right: 12px; font: inherit; color: var(--ink); min-height: 36px; }
+.chip.pick.del { border-style: dashed; color: var(--warn); }
 .chip.pick.sel { background: var(--ball); border-color: var(--ball); color: var(--ball-ink); }
 .chip.duo { background: var(--court-soft); border-color: transparent; font-weight: 600; }
 .alert { border-radius: 12px; padding: 14px; background: var(--warn-soft); color: var(--ink); display: flex; flex-direction: column; gap: 10px; }
@@ -210,7 +211,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   "use strict";
   var KEY = "volei-sorteio-v1";
   var MAX = 16;
-  var EXEMPLO = ["Ana", "Bruno", "Carla", "Diego", "Edu", "Fernanda", "Gabi", "Hugo", "Iara", "João", "Kiko", "Lu", "Marcelo", "Nina", "Otávio"];
+  var DIAS_NA_GALERA = 30; // quem fica esse tempo sem jogar sai da galera salva
 
   // Ordem dos jogos por quantidade de times. Lados: {t: time}, {w: vencedor do jogo}, {l: perdedor do jogo}
   var FORMATO = {
@@ -224,7 +225,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   // Pesos do sorteio. Repetir parceiro pesa mais que ficar parado; 3 ou mais do mesmo time anterior quase nunca acontece.
   var PESO_REPETICAO = 1, PESO_TRIO = 50, PESO_ESPERA = 0.3, PESO_EQUILIBRIO = 25;
 
-  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "rank" }; }
+  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "rank", known: null }; }
   function carregar() {
     try {
       var r = JSON.parse(localStorage.getItem(KEY));
@@ -232,12 +233,28 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var d = padrao();
         for (var k in d) if (r[k] !== undefined) d[k] = r[k];
         d.rounds.forEach(function (x) { if (x.closed === undefined) x.closed = !!x.ranking; });
+        if (!d.known) {
+          // Versão antiga: monta a galera a partir das rodadas e da lista atual.
+          d.known = {};
+          d.rounds.forEach(function (x) { var t = Date.parse(x.date); [].concat.apply([], [].concat.apply([], x.teams)).forEach(function (n) { lembrarEm(d.known, n, t, true); }); });
+          d.names.forEach(function (n) { lembrarEm(d.known, n, Date.now(), false); });
+        }
         return d;
       }
     } catch (e) {}
     return padrao();
   }
+  function lembrarEm(known, n, quando, jogou) {
+    var k = n.trim().toLowerCase(), g = known[k] || (known[k] = { name: n, last: 0, times: 0 });
+    g.name = n; g.last = Math.max(g.last, quando); if (jogou) g.times++;
+  }
   var S = carregar();
+  if (!S.known) S.known = {};
+  (function limparGalera() {
+    var limite = Date.now() - DIAS_NA_GALERA * 864e5, naLista = {};
+    S.names.forEach(function (n) { naLista[n.trim().toLowerCase()] = 1; });
+    for (var k in S.known) if (S.known[k].last < limite && !naLista[k]) delete S.known[k];
+  })();
   function salvar() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
   var ui = { view: "list", sel: null, sheet: null, manual: null, draft: "" };
@@ -348,6 +365,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     S.rounds.push(r);
     if (S.rounds.length > 40) S.rounds = S.rounds.slice(-40);
     S.fromLast = false;
+    S.names.forEach(function (n) { lembrarEm(S.known, n, Date.now(), true); });
     salvar();
     ui.view = "round"; ui.manual = null;
   }
@@ -453,9 +471,10 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       }).join("") + "</div>";
       h += '<div class="row"><button class="btn ghost" data-a="ask" data-s="clear">Limpar lista</button></div>';
     } else {
-      h += '<div class="empty"><span>Nenhum nome ainda.</span><button class="btn" data-a="exemplo">Testar com 15 nomes de exemplo</button></div>';
+      h += '<div class="empty"><span>Lista vazia. ' + (galeraFora().length ? "Toque na galera abaixo ou digite um nome." : "Digite os nomes acima. Quem jogar fica salvo para a próxima.") + "</span></div>";
     }
     h += "</section>";
+    h += painelGalera();
 
     if (need > 0 || S.pairs.length) h += painelDuplas(need);
 
@@ -473,6 +492,37 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     }
     h += historico();
     return h;
+  }
+
+  // Galera salva que ainda não está na lista de hoje, quem joga mais aparece primeiro.
+  function galeraFora() {
+    var naLista = {};
+    S.names.forEach(function (n) { naLista[chave(n)] = 1; });
+    return Object.keys(S.known).filter(function (k) { return !naLista[k]; }).map(function (k) { return S.known[k]; })
+      .sort(function (a, b) { return b.times - a.times || b.last - a.last || a.name.localeCompare(b.name); });
+  }
+  function painelGalera() {
+    var fora = galeraFora();
+    if (!fora.length) return "";
+    var h = '<section class="panel" aria-label="Galera salva"><div class="counter"><h2>Galera</h2>' +
+      '<button class="btn ghost" data-a="galeraEdit">' + (ui.galeraEdit ? "Pronto" : "Remover alguém") + "</button></div>";
+    h += '<p class="hint">' + (ui.galeraEdit
+      ? "Toque em quem não vai mais jogar para tirar da galera."
+      : "Toque para colocar na lista de hoje. Quem fica " + DIAS_NA_GALERA + " dias sem jogar sai daqui sozinho.") + "</p>";
+    h += '<div class="chips">' + fora.map(function (g) {
+      return '<button class="chip pick' + (ui.galeraEdit ? " del" : "") + '" data-a="' + (ui.galeraEdit ? "galeraDel" : "galeraAdd") + '" data-n="' + esc(g.name) + '">' +
+        (ui.galeraEdit ? "× " : "+ ") + esc(g.name) + "</button>";
+    }).join("") + "</div>";
+    if (!ui.galeraEdit && fora.length > 1) h += '<button class="btn" data-a="galeraTodos">Adicionar todos (' + fora.length + ")</button>";
+    return h + "</section>";
+  }
+  function adicionarDaGalera(nomes) {
+    var barrados = [];
+    nomes.forEach(function (n) { if (conflito(n)) barrados.push(n); else S.names.push(n); });
+    S.fromLast = false;
+    salvar();
+    if (barrados.length) toast(barrados[0] + " tem nome parecido com alguém da lista. Ajuste o nome antes de adicionar.");
+    else if (S.names.length > MAX) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
   }
 
   function painelDuplas(need) {
@@ -690,7 +740,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var partes = (campo ? campo.value : "").split(/[\n,;]+/).map(limparNome).filter(Boolean);
     var barrados = [], novos = 0;
     partes.forEach(function (p) {
-      if (conflito(p)) barrados.push(p); else { S.names.push(p); novos++; }
+      if (conflito(p)) barrados.push(p); else { S.names.push(p); lembrarEm(S.known, p, Date.now(), false); novos++; }
     });
     // Quem foi barrado continua no campo para a pessoa completar o sobrenome.
     ui.draft = barrados.join("\n");
@@ -743,7 +793,10 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "view": ui.view = b.getAttribute("data-v"); window.scrollTo(0, 0); break;
       case "add": adicionar(); return;
       case "del": removerNome(+b.getAttribute("data-i")); return;
-      case "exemplo": S.names = EXEMPLO.slice(); S.pairs = []; S.fromLast = false; salvar(); break;
+      case "galeraAdd": adicionarDaGalera([b.getAttribute("data-n")]); break;
+      case "galeraTodos": adicionarDaGalera(galeraFora().map(function (g) { return g.name; })); break;
+      case "galeraEdit": ui.galeraEdit = !ui.galeraEdit; break;
+      case "galeraDel": delete S.known[chave(b.getAttribute("data-n"))]; salvar(); if (!galeraFora().length) ui.galeraEdit = false; break;
       case "pick":
         var nm = b.getAttribute("data-n");
         if (!ui.sel) ui.sel = nm;
