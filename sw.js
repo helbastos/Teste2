@@ -1,5 +1,5 @@
 // Guarda os arquivos do app para funcionar sem internet na quadra.
-const CACHE = "volei-v6";
+const CACHE = "volei-v7";
 const ARQUIVOS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -15,8 +15,10 @@ self.addEventListener("activate", (e) => {
 // Rede primeiro (pega atualizações), cache se estiver offline.
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  // Página principal sempre buscada sem cache, para a versão nova aparecer na hora.
+  const pagina = e.request.mode === "navigate";
   e.respondWith(
-    fetch(e.request)
+    fetch(pagina ? new Request(e.request.url, { cache: "no-store" }) : e.request)
       .then((r) => {
         if (r.ok && new URL(e.request.url).origin === location.origin) {
           const copia = r.clone();

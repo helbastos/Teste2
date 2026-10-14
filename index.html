@@ -127,6 +127,8 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--court); outline-
 .chip.pick { cursor: pointer; padding-right: 12px; font: inherit; color: var(--ink); min-height: 36px; }
 .chip.pick.edit { border-style: dashed; }
 .chip.pick.saiu { border-color: var(--court); }
+.ask { background: var(--court-soft); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ask .chip.pick:not(.sel) { background: var(--surface); }
 .chip .novo { font: 600 10px var(--body); text-transform: uppercase; letter-spacing: .05em; color: var(--court); margin-left: 4px; }
 .chip .nm { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 #renome { width: 100%; flex: none; }
@@ -723,18 +725,27 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       h += "<h2>Zerar histórico?</h2><p>Os próximos sorteios não vão mais considerar quem já jogou junto. A pontuação continua.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="reset">Zerar</button></div>';
     } else if (ui.sheet === "import") {
-      var imp = ui.importacao, prin = imp.lista.filter(function (x) { return !x.sup; }), sup = imp.lista.filter(function (x) { return x.sup; });
+      var imp = ui.importacao, certos = imp.itens.filter(function (x) { return !x.opcoes; }), perguntas = imp.itens.filter(function (x) { return x.opcoes; });
+      var nPrin = imp.itens.filter(function (x) { return !x.sup; }).length, nSup = imp.itens.length - nPrin;
       var chipsDe = function (arr) { return '<div class="chips">' + arr.map(function (x) { return '<span class="chip" style="padding-right:12px">' + esc(x.nome) + (x.conhecido ? "" : '<span class="novo">novo</span>') + "</span>"; }).join("") + "</div>"; };
-      h += "<h2>Lista de presença</h2><p>Encontrei " + plural(prin.length, "nome", "nomes") + (sup.length ? " e " + plural(sup.length, "suplente", "suplentes") : "") + "." +
-        (imp.novos.length ? " " + plural(imp.novos.length, "é novo", "são novos") + " e " + (imp.novos.length === 1 ? "vai" : "vão") + " para a galera." : " Todos já estavam na galera.") +
+      h += "<h2>Lista de presença</h2><p>Encontrei " + plural(nPrin, "nome", "nomes") + (nSup ? " e " + plural(nSup, "suplente", "suplentes") : "") + "." +
         (S.names.length ? " Isso substitui a lista atual." : "") + "</p>";
-      h += chipsDe(prin);
+      perguntas.forEach(function (it) {
+        var idx = imp.itens.indexOf(it);
+        h += '<div class="ask"><p><b>' + esc(it.orig) + "</b>" + (it.sup ? " (suplente)" : "") + " na lista é:</p><div class=\"chips\">" +
+          it.opcoes.concat(["__novo"]).map(function (o) {
+            return '<button class="chip pick' + (it.escolha === o ? " sel" : "") + '" data-a="escolher" data-i="' + idx + '" data-n="' + esc(o) + '">' +
+              (o === "__novo" ? "Outra pessoa (novo)" : esc(o)) + "</button>";
+          }).join("") + "</div></div>";
+      });
+      var prin = certos.filter(function (x) { return !x.sup; }), sup = certos.filter(function (x) { return x.sup; });
+      if (prin.length) h += chipsDe(prin);
       if (sup.length) h += '<p class="hint">Suplentes</p>' + chipsDe(sup);
-      if (imp.ambiguos.length) h += '<p class="hint" style="color:var(--warn)">' + imp.ambiguos.map(function (a) { return esc(a.nome) + ": tem " + esc(a.opcoes.join(" e ")) + " na galera. Depois é só tocar no certo."; }).join(" ") + "</p>";
-      if (imp.repetidos.length) h += '<p class="hint" style="color:var(--warn)">Repetido na lista, ignorei: ' + esc(imp.repetidos.join(", ")) + ".</p>";
-      h += sup.length
-        ? '<div class="row"><button class="btn" data-a="importar" data-v="principal">Só a lista (' + prin.length + ')</button><button class="btn ball" data-a="importar" data-v="todos">Todos (' + (prin.length + sup.length) + ")</button></div>"
-        : '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn ball" data-a="importar" data-v="todos">Usar esta lista</button></div>';
+      var trava = faltaResponder(imp) ? " disabled" : "";
+      if (trava) h += '<p class="hint">Responda ' + (perguntas.length === 1 ? "a pergunta" : "as perguntas") + " acima para continuar.</p>";
+      h += nSup
+        ? '<div class="row"><button class="btn" data-a="importar" data-v="principal"' + trava + ">Só a lista (" + nPrin + ')</button><button class="btn ball" data-a="importar" data-v="todos"' + trava + ">Todos (" + (nPrin + nSup) + ")</button></div>"
+        : '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn ball" data-a="importar" data-v="todos"' + trava + ">Usar esta lista</button></div>";
     } else if (ui.sheet === "rename") {
       var naGalera = !!S.known[chave(ui.renaming)], naLista = S.names.some(function (n) { return chave(n) === chave(ui.renaming); });
       h += "<h2>Editar nome</h2><p>Os pontos e o histórico de " + esc(ui.renaming) + " continuam com o nome novo.</p>";
@@ -765,7 +776,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var campo = document.getElementById("novo");
     var lp = lerListaDePresenca(campo ? campo.value : "");
     if (lp) { ui.importacao = lp; ui.sheet = "import"; render(); return; }
-    var partes = (campo ? campo.value : "").split(/[\n,;]+/).map(limparNome).filter(Boolean);
+    var partes = (campo ? campo.value : "").split(/[\n,;]+/).filter(function (l) { return !linhaDeCabecalho(semCarimbo(l)); }).map(function (l) { return limparNome(semEmoji(semCarimbo(l))); }).filter(pareceNome);
     var barrados = [], novos = 0;
     partes.forEach(function (p) {
       if (conflito(p)) barrados.push(p); else { S.names.push(p); lembrarEm(S.known, p, Date.now(), false); voltou(p); novos++; }
@@ -783,58 +794,58 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     else if (S.names.length > MAX && novos) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
   }
   function primeiroNome(n) { return n.trim().split(" ")[0]; }
+  // Tira o "[14/10 16:50] Fulano: " que o WhatsApp põe ao copiar uma mensagem.
+  function semCarimbo(l) { return l.replace(/^\s*\[[^\]]*\]\s*[^:]{1,40}:\s*/, ""); }
+  // Cabeçalho, horário, "Suplentes", "Obs: ..." e linhas só de emoji não são nomes.
+  function pareceNome(n) { return !!n && !/[\d:!?@#/()]/.test(n) && !/^(suplentes?|obs|quadra|lista)\b/i.test(n) && /\p{L}.*\p{L}/u.test(n); }
+  // Linha que começa com emoji ("🏐 Vôlei de Quarta", "⚠️ 19h ⚠️") ou tem horário é cabeçalho.
+  function linhaDeCabecalho(l) { return /^\s*[\p{Extended_Pictographic}\u2600-\u27BF]/u.test(l) || /\b\d{1,2}\s*h\b|\d{1,2}:\d{2}/i.test(l); }
 
   // ---------- lista de presença do WhatsApp ----------
   function semAcento(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
   function semEmoji(s) { return s.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]/gu, ""); }
   // Lê só as linhas numeradas ("1 - Ana"). Linhas depois de "Suplentes" contam como suplentes.
   function lerListaDePresenca(txt) {
-    var linhas = txt.split(/\r?\n/), numeradas = 0, principal = [], suplentes = [], emSuplentes = false;
-    linhas.forEach(function (l) {
-      var limpa = semEmoji(l).trim();
+    var numeradas = 0, itens = [], emSuplentes = false;
+    txt.split(/\r?\n/).forEach(function (l) {
+      var limpa = semEmoji(semCarimbo(l)).trim();
       if (/^suplente/i.test(limpa)) { emSuplentes = true; return; }
       var m = limpa.match(/^(\d{1,2})\s*[-–—.):]\s*(.*)$/);
       if (!m) return;
       numeradas++;
       var nome = m[2].replace(/\s+/g, " ").trim();
-      if (nome) (emSuplentes ? suplentes : principal).push(nome);
-    });
-    if (numeradas < 3) return null;
-    var lista = [], ambiguos = [], novos = [], repetidos = [];
-    function processa(nome, sup) {
+      if (!nome) return;
       var r = casarComGalera(nome);
-      if (r.ambiguo) { ambiguos.push({ nome: nome, opcoes: r.ambiguo }); return; }
-      var c = conflito(r.nome, null, lista.map(function (x) { return x.nome; }));
-      if (c) { repetidos.push(nome); return; }
-      if (!r.conhecido) novos.push(r.nome);
-      lista.push({ nome: r.nome, sup: sup, conhecido: r.conhecido });
-    }
-    principal.forEach(function (n) { processa(n, false); });
-    suplentes.forEach(function (n) { processa(n, true); });
-    return { lista: lista, ambiguos: ambiguos, novos: novos, repetidos: repetidos };
+      itens.push({ orig: nome, sup: emSuplentes, nome: r.nome || null, conhecido: !!r.conhecido, opcoes: r.opcoes || null, escolha: null });
+    });
+    return numeradas < 3 ? null : { itens: itens };
   }
-  // Acha a pessoa na galera: nome igual (sem acento) ou, se veio só o primeiro nome, o único da galera com esse nome.
+  // Nome igual ao da galera (sem ligar para acento) entra direto. Nome simples que bate com o primeiro nome
+  // de alguém da galera vira pergunta, porque pode ser um novato xará.
   function casarComGalera(nome) {
     var alvo = semAcento(nome), ks = Object.keys(S.known), i;
     for (i = 0; i < ks.length; i++) if (semAcento(S.known[ks[i]].name) === alvo) return { nome: S.known[ks[i]].name, conhecido: true };
     if (alvo.indexOf(" ") < 0) {
       var mesmos = ks.filter(function (k) { return semAcento(primeiroNome(S.known[k].name)) === alvo; });
-      if (mesmos.length === 1) return { nome: S.known[mesmos[0]].name, conhecido: true };
-      if (mesmos.length > 1) return { ambiguo: mesmos.map(function (k) { return S.known[k].name; }) };
+      if (mesmos.length) return { opcoes: mesmos.map(function (k) { return S.known[k].name; }).sort() };
     }
     return { nome: nome, conhecido: false };
   }
+  function nomeFinal(it) { return it.opcoes ? (it.escolha === "__novo" ? it.orig : it.escolha) : it.nome; }
+  function faltaResponder(imp) { return imp.itens.some(function (it) { return it.opcoes && !it.escolha; }); }
   function importar(comSuplentes) {
-    var imp = ui.importacao, agora = Date.now();
-    S.names = imp.lista.filter(function (x) { return comSuplentes || !x.sup; }).map(function (x) { return x.nome; });
-    S.pairs = []; ui.sel = null; S.fromLast = false;
+    var imp = ui.importacao, agora = Date.now(), lista = [], repetidos = [];
+    imp.itens.forEach(function (it) {
+      if (it.sup && !comSuplentes) return;
+      var n = nomeFinal(it);
+      if (conflito(n, null, lista)) repetidos.push(n); else lista.push(n);
+    });
+    S.names = lista;
+    S.pairs = []; ui.sel = null; S.fromLast = false; ui.draft = "";
     S.names.forEach(function (n) { lembrarEm(S.known, n, agora, false); voltou(n); });
-    ui.draft = "";
-    // Xarás que não deu para decidir sobem para o topo da galera, para escolher com um toque.
-    imp.ambiguos.forEach(function (a) { a.opcoes.forEach(function (n) { var g = S.known[chave(n)]; if (g && !S.names.some(function (x) { return chave(x) === chave(n); })) g.removedAt = agora; }); });
     ui.importacao = null;
     salvar();
-    if (imp.ambiguos.length) toast(imp.ambiguos.map(function (a) { return a.nome + ": toque no certo na galera (" + a.opcoes.join(" ou ") + ")"; }).join(". "));
+    if (repetidos.length) toast("Não entrou por nome repetido: " + repetidos.join(", ") + ". Adicione com sobrenome.");
     else if (S.names.length > MAX) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
     else toast(S.names.length + " nomes na lista");
   }
@@ -911,7 +922,8 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "add": adicionar(); return;
       case "del": removerNome(+b.getAttribute("data-i")); return;
       case "galeraAdd": adicionarDaGalera([b.getAttribute("data-n")]); break;
-      case "importar": ui.sheet = null; if (ui.importacao) importar(b.getAttribute("data-v") === "todos"); break;
+      case "importar": if (!ui.importacao || faltaResponder(ui.importacao)) return; ui.sheet = null; importar(b.getAttribute("data-v") === "todos"); break;
+      case "escolher": ui.importacao.itens[+b.getAttribute("data-i")].escolha = b.getAttribute("data-n"); break;
       case "galeraTodos": adicionarDaGalera(galeraFora().map(function (g) { return g.name; })); break;
       case "galeraEdit": ui.galeraEdit = !ui.galeraEdit; break;
       case "editar": ui.renaming = b.getAttribute("data-n"); ui.renameDraft = undefined; ui.renameErro = ""; ui.sheet = "rename"; break;
