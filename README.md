@@ -10,7 +10,7 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
   - 8 nomes: 2 times de 4
   - 4 a 7 nomes: 2 times equilibrados (ex.: 7 vira 4 e 3)
 - Mais de 16: o app pede `nomes - 16` duplas de revezamento. Cada dupla ocupa uma vaga e aparece como `nome1 / nome2`.
-- Dois modos: **pelos pontos** (espalha quem tem média alta) ou **aleatório**.
+- Dois modos: **aleatório** (padrão) ou **pelos pontos** (espalha quem tem média alta).
 - Nos dois modos o sorteio evita repetir parceiros das rodadas recentes (nunca 3 do mesmo time anterior juntos) e, como critério secundário, evita que quem estava descansando no último jogo fique parado também no primeiro jogo da rodada seguinte.
 - Antes de cada sorteio o app confirma a lista. Antes de um novo sorteio, pede o resultado da rodada.
 

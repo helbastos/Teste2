@@ -227,7 +227,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   // Pesos do sorteio. Repetir parceiro pesa mais que ficar parado; 3 ou mais do mesmo time anterior quase nunca acontece.
   var PESO_REPETICAO = 1, PESO_TRIO = 50, PESO_ESPERA = 0.3, PESO_EQUILIBRIO = 25;
 
-  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "rank", known: null }; }
+  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "random", modoPadraoV2: true, known: null }; }
   function carregar() {
     try {
       var r = JSON.parse(localStorage.getItem(KEY));
@@ -235,6 +235,8 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var d = padrao();
         for (var k in d) if (r[k] !== undefined) d[k] = r[k];
         d.rounds.forEach(function (x) { if (x.closed === undefined) x.closed = !!x.ranking; });
+        // O padrão passou a ser aleatório; quem tinha o padrão antigo salvo muda uma vez.
+        if (!r.modoPadraoV2) { d.mode = "random"; d.modoPadraoV2 = true; }
         if (!d.known) {
           // Versão antiga: monta a galera a partir das rodadas e da lista atual.
           d.known = {};
@@ -485,8 +487,8 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       h += '<button class="btn primary block" data-a="view" data-v="round">Ver rodada atual</button>';
     } else {
       h += '<section class="panel" aria-label="Tipo de sorteio"><div class="mode">' +
-        '<button data-a="mode" data-v="rank" aria-pressed="' + (S.mode === "rank") + '">Pelos pontos</button>' +
-        '<button data-a="mode" data-v="random" aria-pressed="' + (S.mode === "random") + '">Aleatório</button></div>' +
+        '<button data-a="mode" data-v="random" aria-pressed="' + (S.mode === "random") + '">Aleatório</button>' +
+        '<button data-a="mode" data-v="rank" aria-pressed="' + (S.mode === "rank") + '">Pelos pontos</button></div>' +
         '<p class="hint">' + (S.mode === "rank"
           ? "Espalha quem tem média de pontos alta para os times ficarem equilibrados."
           : "Ignora os pontos.") + " Nos dois casos evita repetir parceiros e deixar alguém muito tempo parado entre uma rodada e outra.</p></section>";
@@ -575,7 +577,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var h = "", T = r.teams.length, quando = new Date(r.date);
     h += '<div class="meta"><span>' + quando.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }) + " às " +
       quando.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + "</span>";
-    h += "<span>" + (r.mode === "random" ? "Aleatório" : "Pelos pontos") + "</span>";
+    h += "<span>" + (r.mode === "rank" ? "Pelos pontos" : "Aleatório") + "</span>";
     if (r.repeats !== null && r.repeats !== undefined) h += "<span>" + (r.repeats === 0 ? "Nenhuma parceria repetida" : plural(r.repeats, "parceria repetida", "parcerias repetidas")) + "</span>";
     if (r.longWait !== null && r.longWait !== undefined) h += "<span>" + (r.longWait === 0 ? "Ninguém parado 2 jogos" : plural(r.longWait, "pessoa parada", "pessoas paradas") + " 2 jogos") + "</span>";
     h += "</div>";
@@ -845,7 +847,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         else { S.pairs.push([ui.sel, nm]); ui.sel = null; salvar(); }
         break;
       case "undo": S.pairs.splice(+b.getAttribute("data-i"), 1); salvar(); break;
-      case "mode": S.mode = b.getAttribute("data-v") === "random" ? "random" : "rank"; salvar(); break;
+      case "mode": S.mode = b.getAttribute("data-v") === "rank" ? "rank" : "random"; salvar(); break;
       case "ask": ui.sheet = b.getAttribute("data-s"); break;
       case "close": ui.sheet = null; break;
       case "draw": ui.sheet = null; if (prontoParaSortear() && !pendente()) sortear(); window.scrollTo(0, 0); break;
