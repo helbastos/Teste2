@@ -213,11 +213,11 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   };
   var ROTULO = { g1: "Jogo 1", g2: "Jogo 2", g3: "Jogo 3", g4: "Jogo 4" };
   // Pontos por colocação. Só rodadas com 4 times pontuam.
-  var PONTOS = { 4: [3, 2, 1, 0] };
+  var PONTOS = { 4: [3, 1, 1, 0] }; // 1 por vitória + 1 de bônus para quem ganha a final
   // Pesos do sorteio. Repetir parceiro pesa mais que ficar parado; 3 ou mais do mesmo time anterior quase nunca acontece.
   var PESO_REPETICAO = 1, PESO_TRIO = 50, PESO_ESPERA = 0.3, PESO_EQUILIBRIO = 25;
 
-  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "random", modoPadraoV2: true, known: null }; }
+  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "random", modoPadraoV2: true, pontosV2: false, known: null }; }
   function carregar() {
     try {
       var r = JSON.parse(localStorage.getItem(KEY));
@@ -249,6 +249,13 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     S.names.forEach(function (n) { naLista[n.trim().toLowerCase()] = 1; });
     for (var k in S.known) if (S.known[k].last < limite && !naLista[k]) delete S.known[k];
   })();
+  // Regra de pontos mudou: refaz a pontuação a partir das rodadas guardadas, uma vez.
+  if (!S.pontosV2) {
+    S.scores = {};
+    S.rounds.forEach(function (r) { delete r.pts; if (r.closed) aplicarPontos(r, 1); });
+    S.pontosV2 = true;
+    salvar();
+  }
   // Limpa sobras de quando o cabeçalho da lista do WhatsApp entrava como nome.
   (function limparLixo() {
     function lixo(n) { return linhaDeCabecalho(n) || !pareceNome(limparNome(semEmoji(n))) || /^(suplentes?|obs|quadra)\b/i.test(semEmoji(n).trim()); }
@@ -413,7 +420,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       if (l[0] === null || l[1] === null || l.indexOf(v) < 0) delete r.winners[g];
     });
   }
-  function pontua(r) { return !!PONTOS[r.teams.length]; }
+  function pontua(r) { return r.teams.length === 4; }
   function rankingAutomatico(r) {
     var T = r.teams.length, w = r.winners;
     function perd(g) { var l = lados(r, g); return l[0] === w[g] ? l[1] : l[0]; }
@@ -421,13 +428,28 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (T === 4) return w.g3 !== undefined && w.g4 !== undefined ? [w.g3, perd("g3"), w.g4, perd("g4")] : null;
     return null;
   }
+  function vitorias3(r) {
+    var v = [0, 0, 0];
+    for (var g in r.winners) v[r.winners[g]]++;
+    return v;
+  }
+  function tresCompletos(r) { return ["g1", "g2", "g3"].every(function (g) { return r.winners[g] !== undefined; }); }
+  // Pontos de cada time na rodada. 4 times: pela colocação. 3 times: 1 por vitória. 2 times: não pontua.
+  function pontosDaRodada(r) {
+    var T = r.teams.length;
+    if (T === 4 && r.ranking) { var p = [0, 0, 0, 0]; r.ranking.forEach(function (ti, pos) { p[ti] = PONTOS[4][pos]; }); return p; }
+    if (T === 3 && tresCompletos(r)) return vitorias3(r);
+    return null;
+  }
+  // Guarda na rodada os pontos dados, para "Corrigir resultado" devolver exatamente o mesmo valor.
   function aplicarPontos(r, sinal) {
-    if (!r.ranking || !pontua(r)) return;
-    var tab = PONTOS[r.teams.length];
-    r.ranking.forEach(function (ti, pos) {
-      pessoas(r.teams[ti]).forEach(function (n) {
+    var pts = sinal > 0 ? pontosDaRodada(r) : r.pts;
+    if (!pts) return;
+    if (sinal > 0) r.pts = pts; else delete r.pts;
+    r.teams.forEach(function (t, ti) {
+      pessoas(t).forEach(function (n) {
         var k = chave(n), s = S.scores[k] || (S.scores[k] = { name: n, pts: 0, rounds: 0 });
-        s.name = n; s.pts += sinal * tab[pos]; s.rounds += sinal;
+        s.name = n; s.pts += sinal * pts[ti]; s.rounds += sinal;
         if (s.rounds <= 0) delete S.scores[k];
       });
     });
@@ -617,17 +639,39 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     }).join("") + "</div>";
   }
 
+  function resumo3(r) {
+    var v = vitorias3(r), ordem = [0, 1, 2].sort(function (a, b) { return v[b] - v[a] || a - b; });
+    return '<div class="rank">' + ordem.map(function (ti) {
+      return '<div class="rank-row"><span class="pos">+' + v[ti] + '</span><span class="who"><b>Time ' + (ti + 1) + " · " + plural(v[ti], "vitória", "vitórias") + "</b>" + esc(resumoTime(r, ti)) + "</span></div>";
+    }).join("") + "</div>";
+  }
   function secaoSemPontos(r) {
-    var T = r.teams.length, precisaG1 = T === 3;
+    var T = r.teams.length;
+    if (T === 3) return secaoTres(r);
     var h = '<section class="panel" aria-label="Encerrar rodada"><h2>Encerrar rodada</h2>';
     if (r.closed) {
-      h += '<p class="hint">Rodada encerrada. Rodadas com ' + T + ' times não contam pontos.</p>';
+      h += '<p class="hint">Rodada encerrada. Rodadas com 2 times não contam pontos.</p>';
       h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
       h += '<button class="btn ghost" data-a="reabrir">Corrigir resultado</button>';
       return h + "</section>";
     }
-    h += '<p class="hint">Rodadas com ' + T + ' times não contam pontos.' + (precisaG1 ? " Marque pelo menos o vencedor do jogo 1 para o app saber quem jogou por último." : "") + "</p>";
-    h += '<button class="btn primary block" data-a="fechar3"' + (!precisaG1 || r.winners.g1 !== undefined ? "" : " disabled") + ">Encerrar rodada</button>";
+    h += '<p class="hint">Rodadas com 2 times não contam pontos.</p>';
+    h += '<button class="btn primary block" data-a="fechar3">Encerrar rodada</button>';
+    h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
+    return h + "</section>";
+  }
+  function secaoTres(r) {
+    var h = '<section class="panel" aria-label="Pontos da rodada"><h2>Pontos da rodada</h2>';
+    if (r.closed) {
+      h += resumo3(r);
+      h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
+      h += '<button class="btn ghost" data-a="reabrir">Corrigir resultado</button>';
+      return h + "</section>";
+    }
+    var completo = tresCompletos(r);
+    h += '<p class="hint">Com 3 times, cada vitória vale 1 ponto para todo mundo do time.' + (completo ? "" : " Marque o vencedor dos 3 jogos para encerrar.") + "</p>";
+    if (completo) h += resumo3(r);
+    h += '<button class="btn primary block" data-a="fechar3"' + (completo ? "" : " disabled") + ">Confirmar e encerrar</button>";
     h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
     return h + "</section>";
   }
@@ -659,7 +703,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       h += listaRanking(r, auto);
       h += '<button class="btn primary block" data-a="rankok">Confirmar ranking</button>';
     } else {
-      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. 1º ganha 3 pontos, 2º ganha 2, 3º ganha 1 e 4º não pontua.</p>';
+      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. 1º ganha 3 pontos, 2º e 3º ganham 1, 4º não pontua.</p>';
       h += '<button class="btn ghost" data-a="manual">Jogaram em outra ordem? Informar ranking direto</button>';
     }
     h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
@@ -670,7 +714,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var lista = Object.keys(S.scores).map(function (k) { return S.scores[k]; }).filter(function (s) { return s.rounds > 0; });
     lista.sort(function (a, b) { return b.pts - a.pts || b.pts / b.rounds - a.pts / a.rounds || a.name.localeCompare(b.name); });
     var h = '<section class="panel" aria-label="Pontuação"><h2>Pontuação</h2>';
-    h += '<p class="hint">Só rodadas com 4 times contam: 1º ganha 3, 2º ganha 2, 3º ganha 1, 4º ganha 0. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
+    h += '<p class="hint">4 times: 1º ganha 3, 2º e 3º ganham 1, 4º ganha 0. 3 times: cada vitória vale 1. 2 times não contam. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
     if (!lista.length) {
       h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o ranking de uma rodada.</span></div>';
       return h + "</section>" + painelBackup();
@@ -1007,7 +1051,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var auto = rankingAutomatico(r);
         if (auto && !r.closed) fecharComRanking(r, auto);
         break;
-      case "fechar3": if (r && !r.closed && (r.teams.length !== 3 || r.winners.g1 !== undefined)) { r.closed = true; salvar(); } break;
+      case "fechar3": if (r && !r.closed && (r.teams.length !== 3 || tresCompletos(r))) { r.closed = true; aplicarPontos(r, 1); salvar(); } break;
       case "reabrir": if (r && r.closed) reabrir(r); break;
       case "manual": ui.manual = []; break;
       case "mpick": ui.manual.push(+b.getAttribute("data-t")); break;

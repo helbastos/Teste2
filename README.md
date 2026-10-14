@@ -16,8 +16,9 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
 
 ## Pontuação
 
-- 4 times: 1º = 3, 2º = 2, 3º = 1, 4º = 0
-- 2 ou 3 times: não pontua
+- 4 times: 1º = 3, 2º = 1, 3º = 1, 4º = 0 (1 por vitória + 1 de bônus para quem ganha a final)
+- 3 times: cada vitória vale 1
+- 2 times: não pontua
 - Quem está em dupla de revezamento ganha os pontos do time.
 
 ## Lista de presença do WhatsApp
