@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sorteio Vôlei">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1F5FBF">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<!--APP-START-->
+<title>Sorteio do Vôlei</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: uma coluna de app, placar de quadra. Cards de time como "placas" numeradas, jogos como fila de chamada. */
+:root {
+  --bg: #EDF1F6;
+  --surface: #FFFFFF;
+  --ink: #10233D;
+  --muted: #5A6A80;
+  --line: #D3DBE6;
+  --court: #1F5FBF;
+  --court-ink: #FFFFFF;
+  --court-soft: #DCE7F8;
+  --ball: #F2B705;
+  --ball-ink: #2A1F00;
+  --good: #17804F;
+  --warn: #A64B00;
+  --warn-soft: #FDEBD7;
+  --shadow: 0 1px 2px rgba(16, 35, 61, .08), 0 4px 14px rgba(16, 35, 61, .06);
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A1320; --surface: #132037; --ink: #E6EDF7; --muted: #93A3BA; --line: #243552;
+    --court: #5B9BFF; --court-ink: #06142B; --court-soft: #1B3157; --ball: #F5C431; --ball-ink: #2A1F00;
+    --good: #3CC489; --warn: #F2A65A; --warn-soft: #3A2612;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A1320; --surface: #132037; --ink: #E6EDF7; --muted: #93A3BA; --line: #243552;
+  --court: #5B9BFF; --court-ink: #06142B; --court-soft: #1B3157; --ball: #F5C431; --ball-ink: #2A1F00;
+  --good: #3CC489; --warn: #F2A65A; --warn-soft: #3A2612;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 560px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 96px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: .01em; }
+h1 { font-size: 30px; line-height: 1; text-transform: uppercase; }
+h2 { font-size: 22px; text-transform: uppercase; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.ballmark { width: 30px; height: 30px; border-radius: 50%; background: var(--ball); position: relative; flex: none; overflow: hidden; }
+.ballmark::before, .ballmark::after { content: ""; position: absolute; border: 2px solid var(--ball-ink); border-radius: 50%; opacity: .55; }
+.ballmark::before { width: 34px; height: 34px; left: -18px; top: -2px; }
+.ballmark::after { width: 34px; height: 34px; right: -18px; top: 6px; }
+.tabs { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tabs button { border: 0; background: none; color: var(--muted); font: 600 14px var(--body); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.counter { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.count { font-family: var(--display); font-weight: 700; font-size: 64px; line-height: .85; font-variant-numeric: tabular-nums; }
+.count small { font-size: 22px; color: var(--muted); margin-left: 6px; text-transform: uppercase; }
+.shape { text-align: right; color: var(--muted); font-size: 14px; }
+.shape b { display: block; color: var(--ink); font-family: var(--display); font-size: 20px; text-transform: uppercase; }
+.sizes { display: flex; gap: 4px; justify-content: flex-end; margin-top: 4px; }
+.sizes span { min-width: 26px; padding: 2px 6px; border-radius: 6px; background: var(--court-soft); color: var(--ink); font: 700 14px var(--display); text-align: center; font-variant-numeric: tabular-nums; }
+.sizes span.short { background: var(--ball); color: var(--ball-ink); }
+.adder { display: flex; gap: 8px; align-items: flex-start; }
+textarea {
+  flex: 1; min-width: 0; resize: none; font: 16px var(--body); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; max-height: 160px;
+}
+textarea:focus, button:focus-visible { outline: 2px solid var(--court); outline-offset: 2px; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.btn {
+  border: 0; border-radius: 10px; font: 600 16px var(--body); padding: 11px 16px; cursor: pointer;
+  background: var(--court-soft); color: var(--ink); min-height: 44px;
+}
+.btn.primary { background: var(--court); color: var(--court-ink); }
+.btn.ball { background: var(--ball); color: var(--ball-ink); font-family: var(--display); font-size: 22px; text-transform: uppercase; letter-spacing: .03em; }
+.btn.ghost { background: none; color: var(--muted); padding: 8px 4px; min-height: 0; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.btn.danger { background: var(--warn-soft); color: var(--warn); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.block { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 4px 4px 12px; font-size: 15px; max-width: 100%;
+}
+.chip .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.chip .x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
+.chip.pick { cursor: pointer; padding-right: 12px; font: inherit; color: var(--ink); min-height: 36px; }
+.chip.pick.sel { background: var(--ball); border-color: var(--ball); color: var(--ball-ink); }
+.chip.duo { background: var(--court-soft); border-color: transparent; font-weight: 600; }
+.alert { border-radius: 12px; padding: 14px; background: var(--warn-soft); color: var(--ink); display: flex; flex-direction: column; gap: 10px; }
+.alert strong { color: var(--warn); font-family: var(--display); font-size: 20px; text-transform: uppercase; }
+.notice { font-size: 14px; color: var(--muted); background: var(--court-soft); border-radius: 10px; padding: 10px 12px; color: var(--ink); }
+.empty { text-align: center; color: var(--muted); padding: 8px 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+/* Rodada */
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.team { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.team-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.team-head h3 { font-size: 15px; text-transform: uppercase; color: var(--muted); letter-spacing: .06em; }
+.team-num { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: .8; color: var(--court); }
+.team ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.team li { font-size: 16px; overflow-wrap: anywhere; }
+.team li.duo { font-weight: 600; }
+.team li.duo::after { content: "reveza"; margin-left: 6px; font: 600 10px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--court); vertical-align: 2px; }
+.tag { align-self: flex-start; font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .05em; padding: 3px 7px; border-radius: 6px; background: var(--ball); color: var(--ball-ink); }
+.meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.meta span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.games { display: flex; flex-direction: column; gap: 10px; }
+.game { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.game.now { border-color: var(--court); box-shadow: 0 0 0 1px var(--court); }
+.game-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.game-head .lbl { font-family: var(--display); font-weight: 700; font-size: 18px; text-transform: uppercase; }
+.game-head .st { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.game.now .st { color: var(--court); }
+.vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; }
+.vs .x { align-self: center; font-family: var(--display); color: var(--muted); font-size: 18px; }
+.side {
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 8px 10px;
+  text-align: left; cursor: pointer; font: 16px var(--body); min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+.side b { font-family: var(--display); font-size: 20px; text-transform: uppercase; }
+.side span { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.side.win { background: var(--good); border-color: var(--good); color: var(--court-ink); }
+.side.win span { color: inherit; opacity: .85; }
+.side.lose { opacity: .5; }
+.side:disabled { cursor: default; }
+.side.tbd { border-style: dashed; background: none; }
+.rank { display: flex; flex-direction: column; gap: 6px; }
+.rank-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+.rank-row .pos { font-family: var(--display); font-weight: 700; font-size: 26px; width: 34px; font-variant-numeric: tabular-nums; }
+.rank-row:first-child .pos { color: var(--ball-ink); background: var(--ball); border-radius: 8px; text-align: center; }
+.rank-row .who { min-width: 0; font-size: 14px; color: var(--muted); }
+.rank-row .who b { display: block; color: var(--ink); font-family: var(--display); font-size: 18px; text-transform: uppercase; }
+.pickrank { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > .btn { flex: 1; }
+details.hist { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+details.hist summary { cursor: pointer; font-weight: 600; }
+.hist-item { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.hist-item .when { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* Folha de confirmação */
+.scrim { position: fixed; inset: 0; background: rgba(5, 12, 24, .5); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+.sheet {
+  background: var(--surface); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0;
+  padding-top: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 12px; max-height: 88%; overflow-y: auto;
+}
+.sheet p { margin: 0; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: calc(100% - 32px);
+}
+@media (max-width: 360px) { .teams, .pickrank { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: no-preference) {
+  .team { animation: drop .35s ease-out both; }
+  .team:nth-child(2) { animation-delay: .06s; } .team:nth-child(3) { animation-delay: .12s; } .team:nth-child(4) { animation-delay: .18s; }
+  @keyframes drop { from { transform: translateY(6px); opacity: .4; } to { transform: none; opacity: 1; } }
+}
+</style>
+<!--APP-HEAD-END-->
+</head>
+<body>
+<!--APP-BODY-START-->
+<div class="wrap" id="app"></div>
+<div id="layer"></div>
+<script>
+(function () {
+  "use strict";
+  var KEY = "volei-sorteio-v1";
+  var MAX = 16;
+  var EXEMPLO = ["Ana", "Bruno", "Carla", "Diego", "Edu", "Fernanda", "Gabi", "Hugo", "Iara", "João", "Kiko", "Lu", "Marcelo", "Nina", "Otávio"];
+
+  // Ordem dos jogos por quantidade de times. Lados: {t: time}, {w: vencedor do jogo}, {l: perdedor do jogo}
+  var FORMATO = {
+    2: [["g1", { t: 0 }, { t: 1 }]],
+    3: [["g1", { t: 0 }, { t: 1 }], ["g2", { t: 2 }, { l: "g1" }], ["g3", { t: 2 }, { w: "g1" }]],
+    4: [["g1", { t: 0 }, { t: 1 }], ["g2", { t: 2 }, { t: 3 }], ["g3", { w: "g1" }, { w: "g2" }], ["g4", { l: "g1" }, { l: "g2" }]]
+  };
+  var ROTULO = { g1: "Jogo 1", g2: "Jogo 2", g3: "Jogo 3", g4: "Jogo 4" };
+
+  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false }; }
+  function carregar() {
+    try {
+      var r = JSON.parse(localStorage.getItem(KEY));
+      if (r && Array.isArray(r.names)) { var d = padrao(); for (var k in d) if (r[k] !== undefined) d[k] = r[k]; return d; }
+    } catch (e) {}
+    return padrao();
+  }
+  var S = carregar();
+  function salvar() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+  var ui = { view: "list", sel: null, sheet: null, manual: null, draft: "" };
+  if (pendente()) ui.view = "round";
+  if (S.names.length && !pendente()) S.fromLast = true;
+
+  // ---------- utilidades ----------
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function chave(n) { return n.trim().toLowerCase(); }
+  function pk(a, b) { a = chave(a); b = chave(b); return a < b ? a + "|" + b : b + "|" + a; }
+  function media(a) { if (!a.length) return 0; var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+  function embaralhar(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function ultima() { return S.rounds.length ? S.rounds[S.rounds.length - 1] : null; }
+  function pendente() { var r = ultima(); return r && !r.ranking ? r : null; }
+  function nomeUnidade(u) { return u.join(" / "); }
+
+  // ---------- estrutura da lista ----------
+  function duplasNecessarias() { return Math.max(0, S.names.length - MAX); }
+  function vagas() { return S.names.length - S.pairs.length; }
+  function tamanhos(v) {
+    if (v < 4) return [];
+    if (v < 8) return [Math.ceil(v / 2), Math.floor(v / 2)];
+    var t = Math.ceil(v / 4), a = [];
+    for (var i = 0; i < t; i++) a.push(4);
+    a[t - 1] = v - 4 * (t - 1);
+    return a;
+  }
+  function prontoParaSortear() {
+    var n = S.names.length;
+    if (n < 4) return false;
+    return S.pairs.length === duplasNecessarias();
+  }
+  function unidades() {
+    var emDupla = {};
+    S.pairs.forEach(function (p) { emDupla[chave(p[0])] = 1; emDupla[chave(p[1])] = 1; });
+    var u = S.pairs.map(function (p) { return [p[0], p[1]]; });
+    S.names.forEach(function (n) { if (!emDupla[chave(n)]) u.push([n]); });
+    return u;
+  }
+
+  // ---------- sorteio ----------
+  // Peso de "já jogaram juntos": rodada mais recente pesa 1, anteriores vão caindo.
+  function pesosDeParceria() {
+    var m = {}, rs = S.rounds.slice(-8).reverse();
+    rs.forEach(function (r, k) {
+      var w = Math.pow(0.6, k);
+      r.teams.forEach(function (time) {
+        var p = [].concat.apply([], time);
+        for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) { var c = pk(p[i], p[j]); m[c] = (m[c] || 0) + w; }
+      });
+    });
+    return m;
+  }
+  // Nível de cada pessoa a partir das colocações recentes (0 = sempre último, 1 = sempre campeão).
+  function niveis() {
+    var soma = {}, peso = {};
+    var rs = S.rounds.filter(function (r) { return r.ranking; }).slice(-10).reverse();
+    rs.forEach(function (r, k) {
+      var w = Math.pow(0.8, k), T = r.teams.length;
+      r.ranking.forEach(function (ti, pos) {
+        var pts = T > 1 ? (T - 1 - pos) / (T - 1) : 0.5;
+        [].concat.apply([], r.teams[ti]).forEach(function (n) {
+          var c = chave(n); soma[c] = (soma[c] || 0) + w * pts; peso[c] = (peso[c] || 0) + w;
+        });
+      });
+    });
+    return function (n) { var c = chave(n); return ((soma[c] || 0) + 0.5) / ((peso[c] || 0) + 1); };
+  }
+  function custo(times, pw, nv) {
+    var rep = 0, ms = [];
+    times.forEach(function (t) {
+      var p = [].concat.apply([], t);
+      for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) rep += pw[pk(p[i], p[j])] || 0;
+      ms.push(media(p.map(nv)));
+    });
+    var g = media(ms), bal = media(ms.map(function (m) { return (m - g) * (m - g); }));
+    return rep + 25 * bal;
+  }
+  function sortear() {
+    var us = unidades(), tam = tamanhos(us.length), pw = pesosDeParceria(), nv = niveis();
+    var melhor = null, melhorCusto = Infinity;
+    for (var it = 0; it < 4000; it++) {
+      var s = embaralhar(us.slice()), times = [], k = 0;
+      tam.forEach(function (n) { times.push(s.slice(k, k + n)); k += n; });
+      var c = custo(times, pw, nv);
+      if (c < melhorCusto) { melhorCusto = c; melhor = times; }
+    }
+    var antes = ultima();
+    var r = { id: Date.now(), date: new Date().toISOString(), teams: melhor, winners: {}, ranking: null, repeats: repetidos(melhor, antes) };
+    S.rounds.push(r);
+    if (S.rounds.length > 40) S.rounds = S.rounds.slice(-40);
+    S.fromLast = false;
+    salvar();
+    ui.view = "round"; ui.manual = null;
+  }
+  function repetidos(times, antes) {
+    if (!antes) return null;
+    var juntos = {};
+    antes.teams.forEach(function (t) { var p = [].concat.apply([], t); for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) juntos[pk(p[i], p[j])] = 1; });
+    var n = 0;
+    times.forEach(function (t) {
+      var p = [].concat.apply([], t);
+      for (var i = 0; i < p.length; i++) for (var j = i + 1; j < p.length; j++) {
+        if (juntos[pk(p[i], p[j])] && !mesmaDupla(t, p[i], p[j])) n++;
+      }
+    });
+    return n;
+  }
+  function mesmaDupla(time, a, b) { return time.some(function (u) { return u.length === 2 && u.indexOf(a) >= 0 && u.indexOf(b) >= 0; }); }
+
+  // ---------- jogos e ranking ----------
+  function lados(r, g) {
+    var d = FORMATO[r.teams.length].filter(function (x) { return x[0] === g; })[0];
+    return [resolver(r, d[1]), resolver(r, d[2])];
+  }
+  function resolver(r, ref) {
+    if (ref.t !== undefined) return ref.t;
+    var g = ref.w || ref.l, v = r.winners[g];
+    if (v === undefined || v === null) return null;
+    if (ref.w) return v;
+    var l = lados(r, g);
+    return l[0] === v ? l[1] : l[0];
+  }
+  function limparInvalidos(r) {
+    FORMATO[r.teams.length].forEach(function (d) {
+      var g = d[0], v = r.winners[g];
+      if (v === undefined) return;
+      var l = lados(r, g);
+      if (l[0] === null || l[1] === null || l.indexOf(v) < 0) delete r.winners[g];
+    });
+  }
+  function rankingAutomatico(r) {
+    var T = r.teams.length, w = r.winners;
+    function perd(g) { var l = lados(r, g); return l[0] === w[g] ? l[1] : l[0]; }
+    if (T === 2) return w.g1 !== undefined ? [w.g1, perd("g1")] : null;
+    if (T === 4) return w.g3 !== undefined && w.g4 !== undefined ? [w.g3, perd("g3"), w.g4, perd("g4")] : null;
+    if (w.g1 === undefined || w.g2 === undefined || w.g3 === undefined) return null;
+    var v = [0, 0, 0];
+    ["g1", "g2", "g3"].forEach(function (g) { v[w[g]]++; });
+    var ord = [0, 1, 2].sort(function (a, b) { return v[b] - v[a]; });
+    if (v[ord[0]] === v[ord[1]] || v[ord[1]] === v[ord[2]]) return "empate";
+    return ord;
+  }
+
+  // ---------- render ----------
+  var app = document.getElementById("app"), layer = document.getElementById("layer");
+
+  function render() {
+    var r = ultima(), h = "";
+    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"></span><h1>Sorteio do Vôlei</h1></div>';
+    if (r) {
+      h += '<nav class="tabs" aria-label="Telas"><button data-a="view" data-v="list" aria-pressed="' + (ui.view === "list") + '">Lista</button>' +
+        '<button data-a="view" data-v="round" aria-pressed="' + (ui.view === "round") + '">Rodada</button></nav>';
+    }
+    h += "</header>";
+    h += ui.view === "round" && r ? telaRodada(r) : telaLista();
+    app.innerHTML = h;
+    renderSheet();
+  }
+
+  function telaLista() {
+    var n = S.names.length, v = vagas(), tam = tamanhos(v), need = duplasNecessarias(), h = "";
+    h += '<section class="panel" aria-label="Lista de nomes">';
+    h += '<div class="counter"><div class="count">' + n + "<small>" + (n === 1 ? "nome" : "nomes") + "</small></div>";
+    if (tam.length) {
+      h += '<div class="shape"><b>' + tam.length + " times</b>";
+      if (need > 0 && S.pairs.length === need) h += "com " + need + (need === 1 ? " dupla" : " duplas") + " revezando";
+      h += '<div class="sizes">' + tam.map(function (t) { return '<span class="' + (t < 4 ? "short" : "") + '">' + t + "</span>"; }).join("") + "</div></div>";
+    } else {
+      h += '<div class="shape">Mínimo de 4 nomes</div>';
+    }
+    h += "</div>";
+    if (S.fromLast && n) h += '<div class="notice">Esta é a lista da última vez. Confira se alguém saiu ou entrou antes de sortear.</div>';
+    h += '<div class="adder"><textarea id="novo" rows="1" placeholder="Nome ou lista do grupo" aria-label="Adicionar nomes">' + esc(ui.draft) + "</textarea>" +
+      '<button class="btn primary" data-a="add">Adicionar</button></div>';
+    h += '<p class="hint">Pode colar vários de uma vez, um por linha. Números e marcadores da lista do WhatsApp são removidos.</p>';
+    if (n) {
+      h += '<div class="chips">' + S.names.map(function (nm, i) {
+        return '<span class="chip"><span class="n">' + (i + 1) + "</span>" + esc(nm) + '<button class="x" data-a="del" data-i="' + i + '" aria-label="Remover ' + esc(nm) + '">×</button></span>';
+      }).join("") + "</div>";
+      h += '<div class="row"><button class="btn ghost" data-a="ask" data-s="clear">Limpar lista</button></div>';
+    } else {
+      h += '<div class="empty"><span>Nenhum nome ainda.</span><button class="btn" data-a="exemplo">Testar com 15 nomes de exemplo</button></div>';
+    }
+    h += "</section>";
+
+    if (need > 0 || S.pairs.length) h += painelDuplas(need);
+
+    if (pendente()) {
+      h += '<div class="notice">A rodada atual ainda não tem ranking. Registre o resultado dos jogos antes de sortear de novo.</div>';
+      h += '<button class="btn primary block" data-a="view" data-v="round">Ver rodada atual</button>';
+    } else {
+      h += '<button class="btn ball block" data-a="ask" data-s="draw"' + (prontoParaSortear() ? "" : " disabled") + ">Sortear times</button>";
+    }
+    h += historico();
+    return h;
+  }
+
+  function painelDuplas(need) {
+    var h = '<section class="alert" aria-label="Duplas de revezamento">';
+    if (need > 0) {
+      h += "<strong>" + S.names.length + " nomes: " + need + " acima do limite</strong>";
+      h += "<span>O máximo é " + MAX + ". Forme " + need + (need === 1 ? " dupla" : " duplas") + " de revezamento. Cada dupla ocupa uma vaga e entra no time como \"nome1 / nome2\".</span>";
+    } else {
+      h += "<strong>Duplas sobrando</strong><span>Com " + MAX + " nomes ou menos não precisa de revezamento.</span>";
+    }
+    if (S.pairs.length) {
+      h += '<div class="chips">' + S.pairs.map(function (p, i) {
+        return '<span class="chip duo">' + esc(nomeUnidade(p)) + '<button class="x" data-a="undo" data-i="' + i + '" aria-label="Desfazer dupla">×</button></span>';
+      }).join("") + "</div>";
+    }
+    if (S.pairs.length > need) {
+      var sobra = S.pairs.length - need;
+      h += "<span>Desfaça " + sobra + (sobra === 1 ? " dupla." : " duplas.") + "</span>";
+    } else if (S.pairs.length < need) {
+      var falta = need - S.pairs.length;
+      h += "<span>Faltam " + falta + (falta === 1 ? " dupla" : " duplas") + ". Toque em dois nomes para juntar.</span>";
+      var emDupla = {};
+      S.pairs.forEach(function (p) { emDupla[chave(p[0])] = 1; emDupla[chave(p[1])] = 1; });
+      h += '<div class="chips">' + S.names.filter(function (nm) { return !emDupla[chave(nm)]; }).map(function (nm) {
+        return '<button class="chip pick' + (ui.sel === nm ? " sel" : "") + '" data-a="pick" data-n="' + esc(nm) + '">' + esc(nm) + "</button>";
+      }).join("") + "</div>";
+    } else {
+      h += "<span>Duplas completas.</span>";
+    }
+    return h + "</section>";
+  }
+
+  function blocoTime(r, i) {
+    var t = r.teams[i], h = '<article class="team"><div class="team-head"><h3>Time</h3><span class="team-num">' + (i + 1) + "</span></div><ol>";
+    t.forEach(function (u) { h += '<li class="' + (u.length > 1 ? "duo" : "") + '">' + esc(nomeUnidade(u)) + "</li>"; });
+    h += "</ol>";
+    var maior = Math.max.apply(null, r.teams.map(function (x) { return x.length; }));
+    if (t.length < maior) h += '<span class="tag">' + (t.length === 1 ? "1 jogador" : t.length + " jogadores") + ", completa no par ou ímpar</span>";
+    return h + "</article>";
+  }
+  function resumoTime(r, i) { return r.teams[i].map(function (u) { return u[0].split(" ")[0] + (u.length > 1 ? "/" + u[1].split(" ")[0] : ""); }).join(", "); }
+
+  function telaRodada(r) {
+    var h = "", T = r.teams.length, quando = new Date(r.date);
+    h += '<div class="meta"><span>' + quando.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }) + " às " +
+      quando.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + "</span>";
+    if (r.repeats !== null && r.repeats !== undefined) h += "<span>" + (r.repeats === 0 ? "Nenhum parceiro repetido da rodada anterior" : r.repeats + (r.repeats === 1 ? " parceria repetida" : " parcerias repetidas") + " da rodada anterior") + "</span>";
+    h += "</div>";
+    h += '<section class="teams" aria-label="Times">';
+    for (var i = 0; i < T; i++) h += blocoTime(r, i);
+    h += "</section>";
+
+    h += '<h2>Jogos</h2><section class="games">';
+    var agoraMarcado = false, travado = !!r.ranking;
+    FORMATO[T].forEach(function (d) {
+      var g = d[0], l = lados(r, g), v = r.winners[g], pronto = l[0] !== null && l[1] !== null;
+      var agora = pronto && v === undefined && !agoraMarcado && !travado;
+      if (agora) agoraMarcado = true;
+      var st = v !== undefined ? "Encerrado" : agora ? "Agora" : pronto ? "Na fila" : "Aguardando";
+      h += '<div class="game' + (agora ? " now" : "") + '"><div class="game-head"><span class="lbl">' + ROTULO[g] + '</span><span class="st">' + st + "</span></div>";
+      h += '<div class="vs">' + lado(r, g, l[0], d[1], v, travado) + '<span class="x">x</span>' + lado(r, g, l[1], d[2], v, travado) + "</div></div>";
+    });
+    h += "</section>";
+    if (!travado && T > 1) h += '<p class="hint">Toque no time que venceu. Se errar, toque no outro para corrigir.</p>';
+
+    h += secaoRanking(r);
+    return h;
+  }
+
+  function lado(r, g, ti, ref, v, travado) {
+    if (ti === null) {
+      var txt = ref.w ? "Vencedor " + ROTULO[ref.w].toLowerCase() : "Perdedor " + ROTULO[ref.l].toLowerCase();
+      return '<button class="side tbd" disabled><b>?</b><span>' + txt + "</span></button>";
+    }
+    var cls = v === undefined ? "" : v === ti ? " win" : " lose";
+    return '<button class="side' + cls + '" data-a="win" data-g="' + g + '" data-t="' + ti + '"' + (travado ? " disabled" : "") +
+      ' aria-label="Time ' + (ti + 1) + " venceu o " + ROTULO[g] + '"><b>Time ' + (ti + 1) + "</b><span>" + esc(resumoTime(r, ti)) + "</span></button>";
+  }
+
+  function listaRanking(r, ordem) {
+    return '<div class="rank">' + ordem.map(function (ti, p) {
+      return '<div class="rank-row"><span class="pos">' + (p + 1) + 'º</span><span class="who"><b>Time ' + (ti + 1) + "</b>" + esc(resumoTime(r, ti)) + "</span></div>";
+    }).join("") + "</div>";
+  }
+
+  function secaoRanking(r) {
+    var h = '<section class="panel" aria-label="Ranking"><h2>Ranking final</h2>';
+    if (r.ranking) {
+      h += listaRanking(r, r.ranking);
+      h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
+      return h + "</section>";
+    }
+    if (ui.manual) {
+      var T = r.teams.length;
+      h += '<p class="hint">Toque nos times na ordem de colocação, do 1º ao ' + T + "º.</p>";
+      if (ui.manual.length) h += listaRanking(r, ui.manual);
+      if (ui.manual.length < T) {
+        h += '<div class="pickrank">';
+        for (var i = 0; i < T; i++) if (ui.manual.indexOf(i) < 0) h += '<button class="btn" data-a="mpick" data-t="' + i + '">Time ' + (i + 1) + "</button>";
+        h += "</div>";
+      }
+      h += '<div class="row"><button class="btn" data-a="mreset">Recomeçar</button>' +
+        '<button class="btn primary" data-a="mok"' + (ui.manual.length === T ? "" : " disabled") + ">Confirmar ranking</button></div>";
+      h += '<button class="btn ghost" data-a="mcancel">Voltar para os jogos</button>';
+      return h + "</section>";
+    }
+    var auto = rankingAutomatico(r);
+    if (auto === "empate") {
+      h += '<p class="hint">Cada time venceu um jogo. Desempate pelos pontos e informe a ordem.</p>';
+      h += '<button class="btn primary block" data-a="manual">Informar ordem</button>';
+    } else if (auto) {
+      h += listaRanking(r, auto);
+      h += '<button class="btn primary block" data-a="rankok">Confirmar ranking</button>';
+    } else {
+      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. Ele é pedido antes de cada novo sorteio e ajuda a equilibrar os próximos times.</p>';
+      h += '<button class="btn ghost" data-a="manual">Jogaram em outra ordem? Informar ranking direto</button>';
+    }
+    h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
+    return h + "</section>";
+  }
+
+  function historico() {
+    var feitas = S.rounds.filter(function (r) { return r.ranking; });
+    if (!feitas.length) return "";
+    var h = '<details class="hist"><summary>Rodadas anteriores (' + feitas.length + ")</summary>";
+    feitas.slice().reverse().slice(0, 12).forEach(function (r) {
+      var d = new Date(r.date);
+      h += '<div class="hist-item"><span class="when">' + d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + "</span>";
+      r.ranking.forEach(function (ti, p) { h += "<span><b>" + (p + 1) + "º</b> " + esc(r.teams[ti].map(nomeUnidade).join(", ")) + "</span>"; });
+      h += "</div>";
+    });
+    h += '<div class="hist-item"><button class="btn danger" data-a="ask" data-s="reset">Zerar histórico</button><p class="hint">O histórico serve para evitar times repetidos e equilibrar o nível. Zere quando a turma mudar bastante.</p></div>';
+    return h + "</details>";
+  }
+
+  function renderSheet() {
+    if (!ui.sheet) { layer.innerHTML = ""; return; }
+    var h = '<div class="scrim" data-a="close"><div class="sheet" role="dialog" aria-modal="true">';
+    if (ui.sheet === "draw") {
+      var tam = tamanhos(vagas());
+      h += "<h2>A lista tá certinha?</h2><p>" + S.names.length + " nomes, " + tam.length + " times (" + tam.join(", ") + "). Alguém saiu ou entrou?</p>";
+      h += '<div class="chips">' + unidades().map(function (u) { return '<span class="chip' + (u.length > 1 ? " duo" : "") + '" style="padding-right:12px">' + esc(nomeUnidade(u)) + "</span>"; }).join("") + "</div>";
+      h += '<div class="row"><button class="btn" data-a="close">Ajustar lista</button><button class="btn ball" data-a="draw">Tá certa, sortear</button></div>';
+    } else if (ui.sheet === "cancel") {
+      h += "<h2>Descartar sorteio?</h2><p>Os times desta rodada somem e não entram no histórico.</p>";
+      h += '<div class="row"><button class="btn" data-a="close">Manter</button><button class="btn danger" data-a="cancel">Descartar</button></div>';
+    } else if (ui.sheet === "clear") {
+      h += "<h2>Limpar a lista?</h2><p>Remove os " + S.names.length + " nomes e as duplas. O histórico de rodadas continua.</p>";
+      h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="clear">Limpar</button></div>';
+    } else if (ui.sheet === "reset") {
+      h += "<h2>Zerar histórico?</h2><p>Apaga as rodadas e os rankings. Os próximos sorteios não vão mais considerar quem já jogou junto.</p>";
+      h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="reset">Zerar</button></div>';
+    }
+    layer.innerHTML = h + "</div></div>";
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var el = document.querySelector(".toast");
+    if (!el) { el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 2600);
+  }
+
+  // ---------- ações ----------
+  function limparNome(s) {
+    return s.replace(/^[\s\-–•*·>]*\d{0,3}\s*[\-–.)ºª°:]?\s*/, "").replace(/\s+/g, " ").trim();
+  }
+  function adicionar() {
+    var campo = document.getElementById("novo");
+    var bruto = campo ? campo.value : "";
+    var partes = bruto.split(/[\n,;]+/).map(limparNome).filter(Boolean);
+    var repetidosNomes = [], novos = 0;
+    partes.forEach(function (p) {
+      var existe = S.names.some(function (n) { return chave(n) === chave(p); });
+      if (existe) repetidosNomes.push(p); else { S.names.push(p); novos++; }
+    });
+    ui.draft = "";
+    salvar(); render();
+    var c = document.getElementById("novo"); if (c) c.focus();
+    if (repetidosNomes.length) toast(repetidosNomes.join(", ") + (repetidosNomes.length === 1 ? " já está na lista" : " já estão na lista"));
+    else if (S.names.length > MAX && novos) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
+  }
+  function removerNome(i) {
+    var nm = S.names[i];
+    S.names.splice(i, 1);
+    S.pairs = S.pairs.filter(function (p) { return chave(p[0]) !== chave(nm) && chave(p[1]) !== chave(nm); });
+    if (ui.sel === nm) ui.sel = null;
+    salvar(); render();
+  }
+
+  app.addEventListener("input", function (e) {
+    if (e.target.id === "novo") {
+      ui.draft = e.target.value;
+      e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+    }
+  });
+  app.addEventListener("keydown", function (e) {
+    if (e.target.id === "novo" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); adicionar(); }
+  });
+
+  function onClick(e) {
+    var b = e.target.closest("[data-a]");
+    if (!b) return;
+    var a = b.getAttribute("data-a");
+    if (a === "close" && b.classList.contains("scrim") && e.target !== b) return;
+    var r = ultima();
+    switch (a) {
+      case "view": ui.view = b.getAttribute("data-v"); break;
+      case "add": adicionar(); return;
+      case "del": removerNome(+b.getAttribute("data-i")); return;
+      case "exemplo": S.names = EXEMPLO.slice(); S.pairs = []; S.fromLast = false; salvar(); break;
+      case "pick":
+        var nm = b.getAttribute("data-n");
+        if (!ui.sel) ui.sel = nm;
+        else if (ui.sel === nm) ui.sel = null;
+        else { S.pairs.push([ui.sel, nm]); ui.sel = null; salvar(); }
+        break;
+      case "undo": S.pairs.splice(+b.getAttribute("data-i"), 1); salvar(); break;
+      case "ask": ui.sheet = b.getAttribute("data-s"); break;
+      case "close": ui.sheet = null; break;
+      case "draw": ui.sheet = null; if (prontoParaSortear() && !pendente()) sortear(); window.scrollTo(0, 0); break;
+      case "cancel": ui.sheet = null; if (pendente()) { S.rounds.pop(); salvar(); } ui.view = "list"; ui.manual = null; break;
+      case "clear": ui.sheet = null; S.names = []; S.pairs = []; ui.sel = null; S.fromLast = false; salvar(); break;
+      case "reset": ui.sheet = null; S.rounds = S.rounds.filter(function (x) { return !x.ranking; }); salvar(); toast("Histórico zerado"); break;
+      case "win":
+        if (!r || r.ranking) return;
+        r.winners[b.getAttribute("data-g")] = +b.getAttribute("data-t");
+        limparInvalidos(r); salvar(); break;
+      case "rankok":
+        var auto = rankingAutomatico(r);
+        if (Array.isArray(auto)) { r.ranking = auto; salvar(); }
+        break;
+      case "manual": ui.manual = []; break;
+      case "mpick": ui.manual.push(+b.getAttribute("data-t")); break;
+      case "mreset": ui.manual = []; break;
+      case "mcancel": ui.manual = null; break;
+      case "mok":
+        if (ui.manual && ui.manual.length === r.teams.length) { r.ranking = ui.manual.slice(); ui.manual = null; salvar(); }
+        break;
+      case "nova": ui.view = "list"; window.scrollTo(0, 0); if (prontoParaSortear()) ui.sheet = "draw"; break;
+      default: return;
+    }
+    render();
+  }
+  app.addEventListener("click", onClick);
+  layer.addEventListener("click", onClick);
+
+  render();
+
+  if ("serviceWorker" in navigator && location.protocol === "https:" && !/claude/.test(location.hostname)) {
+    try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
+  }
+})();
+</script>
+<!--APP-END-->
+</body>
+</html>
