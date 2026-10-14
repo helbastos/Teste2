@@ -126,6 +126,8 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--court); outline-
 .chip .x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
 .chip.pick { cursor: pointer; padding-right: 12px; font: inherit; color: var(--ink); min-height: 36px; }
 .chip.pick.edit { border-style: dashed; }
+.chip.pick.saiu { border-color: var(--court); }
+.chip .novo { font: 600 10px var(--body); text-transform: uppercase; letter-spacing: .05em; color: var(--court); margin-left: 4px; }
 .chip .nm { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 #renome { width: 100%; flex: none; }
 .chip.pick.sel { background: var(--ball); border-color: var(--ball); color: var(--ball-ink); }
@@ -468,7 +470,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (S.fromLast && n) h += '<div class="notice">Esta é a lista da última vez. Confira se alguém saiu ou entrou antes de sortear.</div>';
     h += '<div class="adder"><textarea id="novo" rows="1" placeholder="Nome ou lista do grupo" aria-label="Adicionar nomes">' + esc(ui.draft) + "</textarea>" +
       '<button class="btn primary" data-a="add">Adicionar</button></div>';
-    h += '<p class="hint">Pode colar vários de uma vez, um por linha. Números e marcadores da lista do WhatsApp são removidos. Nomes repetidos precisam de sobrenome. Toque num nome para editar.</p>';
+    h += '<p class="hint">Pode colar a lista de presença do WhatsApp inteira: o app pega só os nomes numerados e confere com a galera. Nomes repetidos precisam de sobrenome. Toque num nome para editar.</p>';
     if (n) {
       h += '<div class="chips">' + S.names.map(function (nm, i) {
         return '<span class="chip"><button class="nm" data-a="editar" data-n="' + esc(nm) + '" aria-label="Editar ' + esc(nm) + '"><span class="n">' + (i + 1) + "</span>" + esc(nm) + '</button><button class="x" data-a="del" data-i="' + i + '" aria-label="Remover ' + esc(nm) + '">×</button></span>';
@@ -503,7 +505,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var naLista = {};
     S.names.forEach(function (n) { naLista[chave(n)] = 1; });
     return Object.keys(S.known).filter(function (k) { return !naLista[k]; }).map(function (k) { return S.known[k]; })
-      .sort(function (a, b) { return b.times - a.times || b.last - a.last || a.name.localeCompare(b.name); });
+      .sort(function (a, b) { return (b.removedAt || 0) - (a.removedAt || 0) || b.times - a.times || b.last - a.last || a.name.localeCompare(b.name); });
   }
   function painelGalera() {
     var fora = galeraFora();
@@ -514,7 +516,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       ? "Toque em alguém para mudar o nome ou tirar da galera."
       : "Toque para colocar na lista de hoje. Quem fica " + DIAS_NA_GALERA + " dias sem jogar sai daqui sozinho.") + "</p>";
     h += '<div class="chips">' + fora.map(function (g) {
-      return '<button class="chip pick' + (ui.galeraEdit ? " edit" : "") + '" data-a="' + (ui.galeraEdit ? "editar" : "galeraAdd") + '" data-n="' + esc(g.name) + '">' +
+      return '<button class="chip pick' + (ui.galeraEdit ? " edit" : g.removedAt ? " saiu" : "") + '" data-a="' + (ui.galeraEdit ? "editar" : "galeraAdd") + '" data-n="' + esc(g.name) + '">' +
         (ui.galeraEdit ? "✎ " : "+ ") + esc(g.name) + "</button>";
     }).join("") + "</div>";
     if (!ui.galeraEdit && fora.length > 1) h += '<button class="btn" data-a="galeraTodos">Adicionar todos (' + fora.length + ")</button>";
@@ -522,7 +524,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
   function adicionarDaGalera(nomes) {
     var barrados = [];
-    nomes.forEach(function (n) { if (conflito(n)) barrados.push(n); else S.names.push(n); });
+    nomes.forEach(function (n) { if (conflito(n)) barrados.push(n); else { S.names.push(n); voltou(n); } });
     S.fromLast = false;
     salvar();
     if (barrados.length) toast(barrados[0] + " tem nome parecido com alguém da lista. Ajuste o nome antes de adicionar.");
@@ -720,6 +722,19 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     } else if (ui.sheet === "reset") {
       h += "<h2>Zerar histórico?</h2><p>Os próximos sorteios não vão mais considerar quem já jogou junto. A pontuação continua.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="reset">Zerar</button></div>';
+    } else if (ui.sheet === "import") {
+      var imp = ui.importacao, prin = imp.lista.filter(function (x) { return !x.sup; }), sup = imp.lista.filter(function (x) { return x.sup; });
+      var chipsDe = function (arr) { return '<div class="chips">' + arr.map(function (x) { return '<span class="chip" style="padding-right:12px">' + esc(x.nome) + (x.conhecido ? "" : '<span class="novo">novo</span>') + "</span>"; }).join("") + "</div>"; };
+      h += "<h2>Lista de presença</h2><p>Encontrei " + plural(prin.length, "nome", "nomes") + (sup.length ? " e " + plural(sup.length, "suplente", "suplentes") : "") + "." +
+        (imp.novos.length ? " " + plural(imp.novos.length, "é novo", "são novos") + " e " + (imp.novos.length === 1 ? "vai" : "vão") + " para a galera." : " Todos já estavam na galera.") +
+        (S.names.length ? " Isso substitui a lista atual." : "") + "</p>";
+      h += chipsDe(prin);
+      if (sup.length) h += '<p class="hint">Suplentes</p>' + chipsDe(sup);
+      if (imp.ambiguos.length) h += '<p class="hint" style="color:var(--warn)">' + imp.ambiguos.map(function (a) { return esc(a.nome) + ": tem " + esc(a.opcoes.join(" e ")) + " na galera. Depois é só tocar no certo."; }).join(" ") + "</p>";
+      if (imp.repetidos.length) h += '<p class="hint" style="color:var(--warn)">Repetido na lista, ignorei: ' + esc(imp.repetidos.join(", ")) + ".</p>";
+      h += sup.length
+        ? '<div class="row"><button class="btn" data-a="importar" data-v="principal">Só a lista (' + prin.length + ')</button><button class="btn ball" data-a="importar" data-v="todos">Todos (' + (prin.length + sup.length) + ")</button></div>"
+        : '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn ball" data-a="importar" data-v="todos">Usar esta lista</button></div>';
     } else if (ui.sheet === "rename") {
       var naGalera = !!S.known[chave(ui.renaming)], naLista = S.names.some(function (n) { return chave(n) === chave(ui.renaming); });
       h += "<h2>Editar nome</h2><p>Os pontos e o histórico de " + esc(ui.renaming) + " continuam com o nome novo.</p>";
@@ -748,10 +763,12 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
   function adicionar() {
     var campo = document.getElementById("novo");
+    var lp = lerListaDePresenca(campo ? campo.value : "");
+    if (lp) { ui.importacao = lp; ui.sheet = "import"; render(); return; }
     var partes = (campo ? campo.value : "").split(/[\n,;]+/).map(limparNome).filter(Boolean);
     var barrados = [], novos = 0;
     partes.forEach(function (p) {
-      if (conflito(p)) barrados.push(p); else { S.names.push(p); lembrarEm(S.known, p, Date.now(), false); novos++; }
+      if (conflito(p)) barrados.push(p); else { S.names.push(p); lembrarEm(S.known, p, Date.now(), false); voltou(p); novos++; }
     });
     // Quem foi barrado continua no campo para a pessoa completar o sobrenome.
     ui.draft = barrados.join("\n");
@@ -766,11 +783,69 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     else if (S.names.length > MAX && novos) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
   }
   function primeiroNome(n) { return n.trim().split(" ")[0]; }
+
+  // ---------- lista de presença do WhatsApp ----------
+  function semAcento(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
+  function semEmoji(s) { return s.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]/gu, ""); }
+  // Lê só as linhas numeradas ("1 - Ana"). Linhas depois de "Suplentes" contam como suplentes.
+  function lerListaDePresenca(txt) {
+    var linhas = txt.split(/\r?\n/), numeradas = 0, principal = [], suplentes = [], emSuplentes = false;
+    linhas.forEach(function (l) {
+      var limpa = semEmoji(l).trim();
+      if (/^suplente/i.test(limpa)) { emSuplentes = true; return; }
+      var m = limpa.match(/^(\d{1,2})\s*[-–—.):]\s*(.*)$/);
+      if (!m) return;
+      numeradas++;
+      var nome = m[2].replace(/\s+/g, " ").trim();
+      if (nome) (emSuplentes ? suplentes : principal).push(nome);
+    });
+    if (numeradas < 3) return null;
+    var lista = [], ambiguos = [], novos = [], repetidos = [];
+    function processa(nome, sup) {
+      var r = casarComGalera(nome);
+      if (r.ambiguo) { ambiguos.push({ nome: nome, opcoes: r.ambiguo }); return; }
+      var c = conflito(r.nome, null, lista.map(function (x) { return x.nome; }));
+      if (c) { repetidos.push(nome); return; }
+      if (!r.conhecido) novos.push(r.nome);
+      lista.push({ nome: r.nome, sup: sup, conhecido: r.conhecido });
+    }
+    principal.forEach(function (n) { processa(n, false); });
+    suplentes.forEach(function (n) { processa(n, true); });
+    return { lista: lista, ambiguos: ambiguos, novos: novos, repetidos: repetidos };
+  }
+  // Acha a pessoa na galera: nome igual (sem acento) ou, se veio só o primeiro nome, o único da galera com esse nome.
+  function casarComGalera(nome) {
+    var alvo = semAcento(nome), ks = Object.keys(S.known), i;
+    for (i = 0; i < ks.length; i++) if (semAcento(S.known[ks[i]].name) === alvo) return { nome: S.known[ks[i]].name, conhecido: true };
+    if (alvo.indexOf(" ") < 0) {
+      var mesmos = ks.filter(function (k) { return semAcento(primeiroNome(S.known[k].name)) === alvo; });
+      if (mesmos.length === 1) return { nome: S.known[mesmos[0]].name, conhecido: true };
+      if (mesmos.length > 1) return { ambiguo: mesmos.map(function (k) { return S.known[k].name; }) };
+    }
+    return { nome: nome, conhecido: false };
+  }
+  function importar(comSuplentes) {
+    var imp = ui.importacao, agora = Date.now();
+    S.names = imp.lista.filter(function (x) { return comSuplentes || !x.sup; }).map(function (x) { return x.nome; });
+    S.pairs = []; ui.sel = null; S.fromLast = false;
+    S.names.forEach(function (n) { lembrarEm(S.known, n, agora, false); voltou(n); });
+    ui.draft = "";
+    // Xarás que não deu para decidir sobem para o topo da galera, para escolher com um toque.
+    imp.ambiguos.forEach(function (a) { a.opcoes.forEach(function (n) { var g = S.known[chave(n)]; if (g && !S.names.some(function (x) { return chave(x) === chave(n); })) g.removedAt = agora; }); });
+    ui.importacao = null;
+    salvar();
+    if (imp.ambiguos.length) toast(imp.ambiguos.map(function (a) { return a.nome + ": toque no certo na galera (" + a.opcoes.join(" ou ") + ")"; }).join(". "));
+    else if (S.names.length > MAX) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
+    else toast(S.names.length + " nomes na lista");
+  }
+  // Quem sai da lista vai para o topo da galera, para voltar fácil.
+  function voltou(n) { var g = S.known[chave(n)]; if (g) delete g.removedAt; }
   // Bloqueia nome igual, e também mesmo primeiro nome quando um dos dois está sem sobrenome (João e João Silva).
-  function conflito(novo, ignorar) {
+  function conflito(novo, ignorar, lista) {
     var pn = chave(primeiroNome(novo)), so = novo.trim().indexOf(" ") < 0;
-    for (var i = 0; i < S.names.length; i++) {
-      var n = S.names[i];
+    lista = lista || S.names;
+    for (var i = 0; i < lista.length; i++) {
+      var n = lista[i];
       if (ignorar && chave(n) === chave(ignorar)) continue;
       if (chave(n) === chave(novo)) return n;
       if (chave(primeiroNome(n)) === pn && (so || n.trim().indexOf(" ") < 0)) return n;
@@ -809,6 +884,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function removerNome(i) {
     var nm = S.names[i];
     S.names.splice(i, 1);
+    if (S.known[chave(nm)]) S.known[chave(nm)].removedAt = Date.now();
     S.pairs = S.pairs.filter(function (p) { return chave(p[0]) !== chave(nm) && chave(p[1]) !== chave(nm); });
     if (ui.sel === nm) ui.sel = null;
     salvar(); render();
@@ -835,6 +911,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "add": adicionar(); return;
       case "del": removerNome(+b.getAttribute("data-i")); return;
       case "galeraAdd": adicionarDaGalera([b.getAttribute("data-n")]); break;
+      case "importar": ui.sheet = null; if (ui.importacao) importar(b.getAttribute("data-v") === "todos"); break;
       case "galeraTodos": adicionarDaGalera(galeraFora().map(function (g) { return g.name; })); break;
       case "galeraEdit": ui.galeraEdit = !ui.galeraEdit; break;
       case "editar": ui.renaming = b.getAttribute("data-n"); ui.renameDraft = undefined; ui.renameErro = ""; ui.sheet = "rename"; break;

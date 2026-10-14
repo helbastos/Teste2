@@ -20,6 +20,10 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
 - 2 ou 3 times: não pontua
 - Quem está em dupla de revezamento ganha os pontos do time.
 
+## Lista de presença do WhatsApp
+
+Cole a lista inteira no campo de nomes. O app pega só as linhas numeradas ("1 - Ana"), ignora cabeçalho, emojis e números vazios, separa os suplentes e confere cada nome com a galera (sem ligar para acento ou maiúscula). Você escolhe entre usar todos ou só a lista principal. Quem você tirar da lista vai para o topo da galera.
+
 ## Nomes
 
 Quem é adicionado fica salvo na **Galera**: na próxima vez é só tocar no nome (ou em "Adicionar todos"). Quem fica 30 dias sem jogar sai da galera sozinho.
