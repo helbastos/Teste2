@@ -125,7 +125,9 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--court); outline-
 .chip .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 2px; }
 .chip .x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
 .chip.pick { cursor: pointer; padding-right: 12px; font: inherit; color: var(--ink); min-height: 36px; }
-.chip.pick.del { border-style: dashed; color: var(--warn); }
+.chip.pick.edit { border-style: dashed; }
+.chip .nm { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+#renome { width: 100%; flex: none; }
 .chip.pick.sel { background: var(--ball); border-color: var(--ball); color: var(--ball-ink); }
 .chip.duo { background: var(--court-soft); border-color: transparent; font-weight: 600; }
 .alert { border-radius: 12px; padding: 14px; background: var(--warn-soft); color: var(--ink); display: flex; flex-direction: column; gap: 10px; }
@@ -190,7 +192,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
 }
 .sheet p { margin: 0; }
 .toast {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  position: fixed; left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top, 0px));
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: calc(100% - 32px);
 }
 @media (max-width: 360px) { .teams, .pickrank { grid-template-columns: 1fr; } }
@@ -464,10 +466,10 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (S.fromLast && n) h += '<div class="notice">Esta é a lista da última vez. Confira se alguém saiu ou entrou antes de sortear.</div>';
     h += '<div class="adder"><textarea id="novo" rows="1" placeholder="Nome ou lista do grupo" aria-label="Adicionar nomes">' + esc(ui.draft) + "</textarea>" +
       '<button class="btn primary" data-a="add">Adicionar</button></div>';
-    h += '<p class="hint">Pode colar vários de uma vez, um por linha. Números e marcadores da lista do WhatsApp são removidos. Nomes repetidos precisam de sobrenome.</p>';
+    h += '<p class="hint">Pode colar vários de uma vez, um por linha. Números e marcadores da lista do WhatsApp são removidos. Nomes repetidos precisam de sobrenome. Toque num nome para editar.</p>';
     if (n) {
       h += '<div class="chips">' + S.names.map(function (nm, i) {
-        return '<span class="chip"><span class="n">' + (i + 1) + "</span>" + esc(nm) + '<button class="x" data-a="del" data-i="' + i + '" aria-label="Remover ' + esc(nm) + '">×</button></span>';
+        return '<span class="chip"><button class="nm" data-a="editar" data-n="' + esc(nm) + '" aria-label="Editar ' + esc(nm) + '"><span class="n">' + (i + 1) + "</span>" + esc(nm) + '</button><button class="x" data-a="del" data-i="' + i + '" aria-label="Remover ' + esc(nm) + '">×</button></span>';
       }).join("") + "</div>";
       h += '<div class="row"><button class="btn ghost" data-a="ask" data-s="clear">Limpar lista</button></div>';
     } else {
@@ -505,13 +507,13 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var fora = galeraFora();
     if (!fora.length) return "";
     var h = '<section class="panel" aria-label="Galera salva"><div class="counter"><h2>Galera</h2>' +
-      '<button class="btn ghost" data-a="galeraEdit">' + (ui.galeraEdit ? "Pronto" : "Remover alguém") + "</button></div>";
+      '<button class="btn ghost" data-a="galeraEdit">' + (ui.galeraEdit ? "Pronto" : "Editar") + "</button></div>";
     h += '<p class="hint">' + (ui.galeraEdit
-      ? "Toque em quem não vai mais jogar para tirar da galera."
+      ? "Toque em alguém para mudar o nome ou tirar da galera."
       : "Toque para colocar na lista de hoje. Quem fica " + DIAS_NA_GALERA + " dias sem jogar sai daqui sozinho.") + "</p>";
     h += '<div class="chips">' + fora.map(function (g) {
-      return '<button class="chip pick' + (ui.galeraEdit ? " del" : "") + '" data-a="' + (ui.galeraEdit ? "galeraDel" : "galeraAdd") + '" data-n="' + esc(g.name) + '">' +
-        (ui.galeraEdit ? "× " : "+ ") + esc(g.name) + "</button>";
+      return '<button class="chip pick' + (ui.galeraEdit ? " edit" : "") + '" data-a="' + (ui.galeraEdit ? "editar" : "galeraAdd") + '" data-n="' + esc(g.name) + '">' +
+        (ui.galeraEdit ? "✎ " : "+ ") + esc(g.name) + "</button>";
     }).join("") + "</div>";
     if (!ui.galeraEdit && fora.length > 1) h += '<button class="btn" data-a="galeraTodos">Adicionar todos (' + fora.length + ")</button>";
     return h + "</section>";
@@ -716,6 +718,13 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     } else if (ui.sheet === "reset") {
       h += "<h2>Zerar histórico?</h2><p>Os próximos sorteios não vão mais considerar quem já jogou junto. A pontuação continua.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="reset">Zerar</button></div>';
+    } else if (ui.sheet === "rename") {
+      var naGalera = !!S.known[chave(ui.renaming)], naLista = S.names.some(function (n) { return chave(n) === chave(ui.renaming); });
+      h += "<h2>Editar nome</h2><p>Os pontos e o histórico de " + esc(ui.renaming) + " continuam com o nome novo.</p>";
+      h += '<textarea id="renome" rows="1" aria-label="Nome novo">' + esc(ui.renameDraft !== undefined ? ui.renameDraft : ui.renaming) + "</textarea>";
+      if (ui.renameErro) h += '<p class="hint" style="color:var(--warn)">' + esc(ui.renameErro) + "</p>";
+      h += '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn primary" data-a="renomear">Salvar</button></div>';
+      if (naGalera && !naLista) h += '<button class="btn danger" data-a="galeraDel">Tirar da galera</button>';
     } else if (ui.sheet === "zeropts") {
       h += "<h2>Zerar pontuação?</h2><p>Todo mundo volta para zero. Não dá para desfazer.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="zeropts">Zerar</button></div>';
@@ -756,14 +765,44 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
   function primeiroNome(n) { return n.trim().split(" ")[0]; }
   // Bloqueia nome igual, e também mesmo primeiro nome quando um dos dois está sem sobrenome (João e João Silva).
-  function conflito(novo) {
+  function conflito(novo, ignorar) {
     var pn = chave(primeiroNome(novo)), so = novo.trim().indexOf(" ") < 0;
     for (var i = 0; i < S.names.length; i++) {
       var n = S.names[i];
+      if (ignorar && chave(n) === chave(ignorar)) continue;
       if (chave(n) === chave(novo)) return n;
       if (chave(primeiroNome(n)) === pn && (so || n.trim().indexOf(" ") < 0)) return n;
     }
     return null;
+  }
+  // Troca o nome em tudo: lista, duplas, galera, pontos e rodadas anteriores.
+  function renomear(velho, novo) {
+    var kv = chave(velho), kn = chave(novo);
+    function troca(n) { return chave(n) === kv ? novo : n; }
+    S.names = S.names.map(troca);
+    S.pairs = S.pairs.map(function (p) { return p.map(troca); });
+    S.rounds.forEach(function (r) { r.teams = r.teams.map(function (t) { return t.map(function (u) { return u.map(troca); }); }); });
+    [S.known, S.scores].forEach(function (m) {
+      if (!m[kv]) return;
+      var x = m[kv]; delete m[kv]; x.name = novo; m[kn] = x;
+    });
+    if (ui.sel && chave(ui.sel) === kv) ui.sel = novo;
+    salvar();
+  }
+  function tentarRenomear() {
+    var campo = document.getElementById("renome"), novo = limparNome(campo ? campo.value : "");
+    var velho = ui.renaming, kv = chave(velho);
+    if (!novo) { ui.renameErro = "Escreva um nome."; return false; }
+    var c = conflito(novo, velho);
+    var outroNaGalera = S.known[chave(novo)] && chave(novo) !== kv;
+    if (c || outroNaGalera) {
+      ui.renameDraft = novo;
+      ui.renameErro = c ? "Já tem " + c + " na lista. Use um nome diferente, com sobrenome." : "Já tem " + S.known[chave(novo)].name + " na galera. Use um nome diferente.";
+      return false;
+    }
+    renomear(velho, novo);
+    toast(velho + " agora é " + novo);
+    return true;
   }
   function removerNome(i) {
     var nm = S.names[i];
@@ -796,7 +835,9 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "galeraAdd": adicionarDaGalera([b.getAttribute("data-n")]); break;
       case "galeraTodos": adicionarDaGalera(galeraFora().map(function (g) { return g.name; })); break;
       case "galeraEdit": ui.galeraEdit = !ui.galeraEdit; break;
-      case "galeraDel": delete S.known[chave(b.getAttribute("data-n"))]; salvar(); if (!galeraFora().length) ui.galeraEdit = false; break;
+      case "editar": ui.renaming = b.getAttribute("data-n"); ui.renameDraft = undefined; ui.renameErro = ""; ui.sheet = "rename"; break;
+      case "renomear": if (tentarRenomear()) ui.sheet = null; break;
+      case "galeraDel": ui.sheet = null; delete S.known[chave(ui.renaming)]; salvar(); toast(ui.renaming + " saiu da galera"); if (!galeraFora().length) ui.galeraEdit = false; break;
       case "pick":
         var nm = b.getAttribute("data-n");
         if (!ui.sel) ui.sel = nm;
@@ -836,6 +877,9 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
   app.addEventListener("click", onClick);
   layer.addEventListener("click", onClick);
+  layer.addEventListener("keydown", function (e) {
+    if (e.target.id === "renome" && e.key === "Enter") { e.preventDefault(); if (tentarRenomear()) ui.sheet = null; render(); }
+  });
 
   render();
 
