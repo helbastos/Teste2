@@ -263,6 +263,14 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     S.names.forEach(function (n) { naLista[n.trim().toLowerCase()] = 1; });
     for (var k in S.known) if (S.known[k].last < limite && !naLista[k]) delete S.known[k];
   })();
+  // Limpa sobras de quando o cabeçalho da lista do WhatsApp entrava como nome.
+  (function limparLixo() {
+    function lixo(n) { return linhaDeCabecalho(n) || !pareceNome(limparNome(semEmoji(n))) || /^(suplentes?|obs|quadra)\b/i.test(semEmoji(n).trim()); }
+    var antes = S.names.length;
+    S.names = S.names.filter(function (n) { return !lixo(n); });
+    for (var k in S.known) if (!S.known[k].times && lixo(S.known[k].name)) delete S.known[k];
+    if (S.names.length !== antes) salvar();
+  })();
   function salvar() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
   var ui = { view: "list", sel: null, sheet: null, manual: null, draft: "" };
