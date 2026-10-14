@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Vôlei dax Gayx">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#1F5FBF">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0B0B0C">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -20,38 +20,26 @@
 <style>
 /* Layout: uma coluna de app, placar de quadra. Cards de time como "placas" numeradas, jogos como fila de chamada. */
 :root {
-  --bg: #EDF1F6;
-  --surface: #FFFFFF;
-  --ink: #10233D;
-  --muted: #5A6A80;
-  --line: #D3DBE6;
-  --court: #1F5FBF;
-  --court-ink: #FFFFFF;
-  --court-soft: #DCE7F8;
+  /* Visual único escuro: preto e cinza, a bola colorida e o amarelo do Sortear são as únicas cores. */
+  --bg: #0B0B0C;
+  --surface: #18181B;
+  --ink: #F2F2F3;
+  --muted: #9B9BA3;
+  --line: #2D2D33;
+  --court: #DADADF;
+  --court-ink: #0B0B0C;
+  --court-soft: #2A2A30;
   --ball: #F2B705;
-  --ball-ink: #2A1F00;
-  --good: #17804F;
-  --warn: #A64B00;
-  --warn-soft: #FDEBD7;
-  --shadow: 0 1px 2px rgba(16, 35, 61, .08), 0 4px 14px rgba(16, 35, 61, .06);
+  --ball-ink: #1F1700;
+  --good: #3CC489;
+  --warn: #F2A65A;
+  --warn-soft: #36240F;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5);
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
   --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0A1320; --surface: #132037; --ink: #E6EDF7; --muted: #93A3BA; --line: #243552;
-    --court: #5B9BFF; --court-ink: #06142B; --court-soft: #1B3157; --ball: #F5C431; --ball-ink: #2A1F00;
-    --good: #3CC489; --warn: #F2A65A; --warn-soft: #3A2612;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .4); color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0A1320; --surface: #132037; --ink: #E6EDF7; --muted: #93A3BA; --line: #243552;
-  --court: #5B9BFF; --court-ink: #06142B; --court-soft: #1B3157; --ball: #F5C431; --ball-ink: #2A1F00;
-  --good: #3CC489; --warn: #F2A65A; --warn-soft: #3A2612;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .4); color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -152,11 +140,11 @@ textarea:focus, button:focus-visible { outline: 2px solid var(--court); outline-
 .meta span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
 .games { display: flex; flex-direction: column; gap: 10px; }
 .game { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.game.now { border-color: var(--court); box-shadow: 0 0 0 1px var(--court); }
+.game.now { border-color: var(--ball); box-shadow: 0 0 0 1px var(--ball); }
 .game-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .game-head .lbl { font-family: var(--display); font-weight: 700; font-size: 18px; text-transform: uppercase; }
 .game-head .st { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.game.now .st { color: var(--court); }
+.game.now .st { color: var(--ball); }
 .vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; }
 .vs .x { align-self: center; font-family: var(--display); color: var(--muted); font-size: 18px; }
 .side {
@@ -185,7 +173,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
 .hist-item .when { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
 
 /* Folha de confirmação */
-.scrim { position: fixed; inset: 0; background: rgba(5, 12, 24, .5); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+.scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
 .sheet {
   background: var(--surface); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0;
   padding-top: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
@@ -453,7 +441,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function render() {
     var r = ultima(), h = "";
     if (ui.view === "round" && !r) ui.view = "list";
-    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><clipPath id="vb-ball"><circle cx="50" cy="50" r="46"/></clipPath><g clip-path="url(#vb-ball)"><clipPath id="vb-s0"><path d="M50 50 Q70.00 15.36 50.00 -30.00 L188.56 -30.00 L119.28 90.00 Q70.00 84.64 50 50 Z"/></clipPath><g clip-path="url(#vb-s0)" stroke="#10233D" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="110.62" cy="15.00" r="56" fill="#FF8C00"/><circle cx="110.62" cy="15.00" r="40" fill="#E40303"/></g><clipPath id="vb-s1"><path d="M50 50 Q70.00 84.64 119.28 90.00 L50.00 210.00 L-19.28 90.00 Q10.00 50.00 50 50 Z"/></clipPath><g clip-path="url(#vb-s1)" stroke="#10233D" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="50.00" cy="120.00" r="56" fill="#008026"/><circle cx="50.00" cy="120.00" r="40" fill="#FFED00"/></g><clipPath id="vb-s2"><path d="M50 50 Q10.00 50.00 -19.28 90.00 L-88.56 -30.00 L50.00 -30.00 Q70.00 15.36 50 50 Z"/></clipPath><g clip-path="url(#vb-s2)" stroke="#10233D" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="-10.62" cy="15.00" r="56" fill="#750787"/><circle cx="-10.62" cy="15.00" r="40" fill="#004DFF"/></g><g fill="none" stroke="#10233D" stroke-width="2.6"><path d="M50 50 Q70.00 15.36 50.00 -30.00"/><path d="M50 50 Q70.00 84.64 119.28 90.00"/><path d="M50 50 Q10.00 50.00 -19.28 90.00"/></g></g><circle cx="50" cy="50" r="46" fill="none" stroke="#10233D" stroke-width="3.6"/></svg></span><h1>Vôlei dax Gayx</h1></div></header>';
+    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><clipPath id="vb-ball"><circle cx="50" cy="50" r="46"/></clipPath><g clip-path="url(#vb-ball)"><clipPath id="vb-s0"><path d="M50 50 Q70.00 15.36 50.00 -30.00 L188.56 -30.00 L119.28 90.00 Q70.00 84.64 50 50 Z"/></clipPath><g clip-path="url(#vb-s0)" stroke="#0B0B0C" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="110.62" cy="15.00" r="56" fill="#FF8C00"/><circle cx="110.62" cy="15.00" r="40" fill="#E40303"/></g><clipPath id="vb-s1"><path d="M50 50 Q70.00 84.64 119.28 90.00 L50.00 210.00 L-19.28 90.00 Q10.00 50.00 50 50 Z"/></clipPath><g clip-path="url(#vb-s1)" stroke="#0B0B0C" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="50.00" cy="120.00" r="56" fill="#008026"/><circle cx="50.00" cy="120.00" r="40" fill="#FFED00"/></g><clipPath id="vb-s2"><path d="M50 50 Q10.00 50.00 -19.28 90.00 L-88.56 -30.00 L50.00 -30.00 Q70.00 15.36 50 50 Z"/></clipPath><g clip-path="url(#vb-s2)" stroke="#0B0B0C" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="-10.62" cy="15.00" r="56" fill="#750787"/><circle cx="-10.62" cy="15.00" r="40" fill="#004DFF"/></g><g fill="none" stroke="#0B0B0C" stroke-width="2.6"><path d="M50 50 Q70.00 15.36 50.00 -30.00"/><path d="M50 50 Q70.00 84.64 119.28 90.00"/><path d="M50 50 Q10.00 50.00 -19.28 90.00"/></g></g><circle cx="50" cy="50" r="46" fill="none" stroke="#0B0B0C" stroke-width="3.6"/></svg></span><h1>Vôlei dax Gayx</h1></div></header>';
     h += '<nav class="tabs" aria-label="Telas">' +
       '<button data-a="view" data-v="list" aria-pressed="' + (ui.view === "list") + '">Lista</button>' +
       '<button data-a="view" data-v="round" aria-pressed="' + (ui.view === "round") + '"' + (r ? "" : " disabled") + ">Rodada</button>" +
