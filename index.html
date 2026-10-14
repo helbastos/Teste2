@@ -219,10 +219,10 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     4: [["g1", { t: 0 }, { t: 1 }], ["g2", { t: 2 }, { t: 3 }], ["g3", { w: "g1" }, { w: "g2" }], ["g4", { l: "g1" }, { l: "g2" }]]
   };
   var ROTULO = { g1: "Jogo 1", g2: "Jogo 2", g3: "Jogo 3", g4: "Jogo 4" };
-  // Pontos por colocação. Rodada com 3 times não pontua.
-  var PONTOS = { 2: [3, 0], 4: [3, 2, 1, 0] };
-  // Pesos do sorteio
-  var PESO_REPETICAO = 1, PESO_ESPERA = 1.5, PESO_EQUILIBRIO = 25;
+  // Pontos por colocação. Só rodadas com 4 times pontuam.
+  var PONTOS = { 4: [3, 2, 1, 0] };
+  // Pesos do sorteio. Repetir parceiro pesa mais que ficar parado; 3 ou mais do mesmo time anterior quase nunca acontece.
+  var PESO_REPETICAO = 1, PESO_TRIO = 50, PESO_ESPERA = 0.3, PESO_EQUILIBRIO = 25;
 
   function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "rank" }; }
   function carregar() {
@@ -309,10 +309,18 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     for (var k in ultimoJogo) out[k] = defs.length - 1 - ultimoJogo[k];
     return out;
   }
-  function avaliar(times, pw, esp, equilibrar) {
-    var rep = 0, ms = [], longa = 0;
+  // Em qual time cada pessoa estava na rodada anterior.
+  function timeAnterior(r) {
+    var m = {};
+    if (r) r.teams.forEach(function (t, ti) { pessoas(t).forEach(function (n) { m[chave(n)] = ti; }); });
+    return m;
+  }
+  function avaliar(times, pw, esp, equilibrar, ant) {
+    var rep = 0, ms = [], longa = 0, trio = 0;
     times.forEach(function (t, ti) {
-      var p = pessoas(t);
+      var p = pessoas(t), vindos = {};
+      p.forEach(function (n) { var a = ant[chave(n)]; if (a !== undefined) vindos[a] = (vindos[a] || 0) + 1; });
+      for (var a in vindos) if (vindos[a] >= 3) trio += vindos[a] - 2;
       for (var i = 0; i < p.length; i++) {
         for (var j = i + 1; j < p.length; j++) rep += pw[pk(p[i], p[j])] || 0;
         // Times 1 e 2 jogam o primeiro jogo. Quem cai nos outros espera pelo menos mais um jogo.
@@ -322,15 +330,15 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     });
     var bal = 0;
     if (equilibrar) { var g = media(ms); bal = media(ms.map(function (m) { return (m - g) * (m - g); })); }
-    return PESO_REPETICAO * rep + PESO_ESPERA * longa + PESO_EQUILIBRIO * bal;
+    return PESO_REPETICAO * rep + PESO_TRIO * trio + PESO_ESPERA * longa + PESO_EQUILIBRIO * bal;
   }
   function sortear() {
-    var us = unidades(), tam = tamanhos(us.length), pw = pesosDeParceria(), antes = ultima(), esp = esperaNoFim(antes);
+    var us = unidades(), tam = tamanhos(us.length), pw = pesosDeParceria(), antes = ultima(), esp = esperaNoFim(antes), ant = timeAnterior(antes);
     var equilibrar = S.mode === "rank", melhor = null, melhorCusto = Infinity;
     for (var it = 0; it < 5000; it++) {
       var s = embaralhar(us.slice()), times = [], k = 0;
       tam.forEach(function (n) { times.push(s.slice(k, k + n)); k += n; });
-      var c = avaliar(times, pw, esp, equilibrar);
+      var c = avaliar(times, pw, esp, equilibrar, ant);
       if (c < melhorCusto) { melhorCusto = c; melhor = times; }
     }
     var r = {
@@ -438,7 +446,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (S.fromLast && n) h += '<div class="notice">Esta é a lista da última vez. Confira se alguém saiu ou entrou antes de sortear.</div>';
     h += '<div class="adder"><textarea id="novo" rows="1" placeholder="Nome ou lista do grupo" aria-label="Adicionar nomes">' + esc(ui.draft) + "</textarea>" +
       '<button class="btn primary" data-a="add">Adicionar</button></div>';
-    h += '<p class="hint">Pode colar vários de uma vez, um por linha. Números e marcadores da lista do WhatsApp são removidos.</p>';
+    h += '<p class="hint">Pode colar vários de uma vez, um por linha. Números e marcadores da lista do WhatsApp são removidos. Nomes repetidos precisam de sobrenome.</p>';
     if (n) {
       h += '<div class="chips">' + S.names.map(function (nm, i) {
         return '<span class="chip"><span class="n">' + (i + 1) + "</span>" + esc(nm) + '<button class="x" data-a="del" data-i="' + i + '" aria-label="Remover ' + esc(nm) + '">×</button></span>';
@@ -503,7 +511,13 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (t.length < maior) h += '<span class="tag">' + plural(t.length, "jogador", "jogadores") + ", completa no par ou ímpar</span>";
     return h + "</article>";
   }
-  function resumoTime(r, i) { return r.teams[i].map(function (u) { return u[0].split(" ")[0] + (u.length > 1 ? "/" + u[1].split(" ")[0] : ""); }).join(", "); }
+  function nomeCurto(r, n) {
+    var pn = chave(primeiroNome(n)), xara = 0;
+    r.teams.forEach(function (t) { pessoas(t).forEach(function (m) { if (chave(primeiroNome(m)) === pn) xara++; }); });
+    var partes = n.trim().split(" ");
+    return xara > 1 && partes.length > 1 ? partes[0] + " " + partes[partes.length - 1].charAt(0) + "." : partes[0];
+  }
+  function resumoTime(r, i) { return r.teams[i].map(function (u) { return nomeCurto(r, u[0]) + (u.length > 1 ? "/" + nomeCurto(r, u[1]) : ""); }).join(", "); }
 
   function telaRodada(r) {
     var h = "", T = r.teams.length, quando = new Date(r.date);
@@ -530,7 +544,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     h += "</section>";
     if (!travado) h += '<p class="hint">Toque no time que venceu. Se errar, toque no outro para corrigir.</p>';
 
-    h += pontua(r) ? secaoRanking(r) : secaoTresTimes(r);
+    h += pontua(r) ? secaoRanking(r) : secaoSemPontos(r);
     return h;
   }
 
@@ -551,16 +565,17 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     }).join("") + "</div>";
   }
 
-  function secaoTresTimes(r) {
+  function secaoSemPontos(r) {
+    var T = r.teams.length, precisaG1 = T === 3;
     var h = '<section class="panel" aria-label="Encerrar rodada"><h2>Encerrar rodada</h2>';
     if (r.closed) {
-      h += '<p class="hint">Rodada encerrada. Rodadas com 3 times não contam pontos.</p>';
+      h += '<p class="hint">Rodada encerrada. Rodadas com ' + T + ' times não contam pontos.</p>';
       h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
       h += '<button class="btn ghost" data-a="reabrir">Corrigir resultado</button>';
       return h + "</section>";
     }
-    h += '<p class="hint">Rodadas com 3 times não contam pontos. Marque pelo menos o vencedor do jogo 1 para o app saber quem jogou por último.</p>';
-    h += '<button class="btn primary block" data-a="fechar3"' + (r.winners.g1 !== undefined ? "" : " disabled") + ">Encerrar rodada</button>";
+    h += '<p class="hint">Rodadas com ' + T + ' times não contam pontos.' + (precisaG1 ? " Marque pelo menos o vencedor do jogo 1 para o app saber quem jogou por último." : "") + "</p>";
+    h += '<button class="btn primary block" data-a="fechar3"' + (!precisaG1 || r.winners.g1 !== undefined ? "" : " disabled") + ">Encerrar rodada</button>";
     h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
     return h + "</section>";
   }
@@ -592,8 +607,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       h += listaRanking(r, auto);
       h += '<button class="btn primary block" data-a="rankok">Confirmar ranking</button>';
     } else {
-      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. ' +
-        (r.teams.length === 4 ? "1º ganha 3 pontos, 2º ganha 2, 3º ganha 1 e 4º não pontua." : "Quem vence ganha 3 pontos.") + "</p>";
+      h += '<p class="hint">O ranking sai sozinho quando todos os jogos tiverem vencedor. 1º ganha 3 pontos, 2º ganha 2, 3º ganha 1 e 4º não pontua.</p>';
       h += '<button class="btn ghost" data-a="manual">Jogaram em outra ordem? Informar ranking direto</button>';
     }
     h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
@@ -604,7 +618,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var lista = Object.keys(S.scores).map(function (k) { return S.scores[k]; }).filter(function (s) { return s.rounds > 0; });
     lista.sort(function (a, b) { return b.pts - a.pts || b.pts / b.rounds - a.pts / a.rounds || a.name.localeCompare(b.name); });
     var h = '<section class="panel" aria-label="Pontuação"><h2>Pontuação</h2>';
-    h += '<p class="hint">4 times: 1º ganha 3, 2º ganha 2, 3º ganha 1, 4º ganha 0. 2 times: quem vence ganha 3. Rodadas com 3 times não contam. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
+    h += '<p class="hint">Só rodadas com 4 times contam: 1º ganha 3, 2º ganha 2, 3º ganha 1, 4º ganha 0. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
     if (!lista.length) {
       h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o ranking de uma rodada.</span></div>';
       return h + "</section>";
@@ -674,16 +688,32 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function adicionar() {
     var campo = document.getElementById("novo");
     var partes = (campo ? campo.value : "").split(/[\n,;]+/).map(limparNome).filter(Boolean);
-    var repetidosNomes = [], novos = 0;
+    var barrados = [], novos = 0;
     partes.forEach(function (p) {
-      var existe = S.names.some(function (n) { return chave(n) === chave(p); });
-      if (existe) repetidosNomes.push(p); else { S.names.push(p); novos++; }
+      if (conflito(p)) barrados.push(p); else { S.names.push(p); novos++; }
     });
-    ui.draft = "";
+    // Quem foi barrado continua no campo para a pessoa completar o sobrenome.
+    ui.draft = barrados.join("\n");
     salvar(); render();
-    var c = document.getElementById("novo"); if (c) c.focus();
-    if (repetidosNomes.length) toast(repetidosNomes.join(", ") + (repetidosNomes.length === 1 ? " já está na lista" : " já estão na lista"));
+    var c = document.getElementById("novo"); if (c) { c.focus(); c.style.height = "auto"; c.style.height = Math.min(c.scrollHeight, 160) + "px"; }
+    if (barrados.length) {
+      var ex = barrados[0], outro = conflito(ex), novoTemSobrenome = ex.indexOf(" ") > 0;
+      toast(chave(outro) === chave(ex) && novoTemSobrenome ? outro + " já está na lista."
+        : !novoTemSobrenome ? "Já tem " + outro + " na lista. Adicione com sobrenome."
+        : "Já tem " + outro + " sem sobrenome na lista. Remova e adicione de novo com sobrenome.");
+    }
     else if (S.names.length > MAX && novos) toast("Passou de " + MAX + ". Forme as duplas de revezamento.");
+  }
+  function primeiroNome(n) { return n.trim().split(" ")[0]; }
+  // Bloqueia nome igual, e também mesmo primeiro nome quando um dos dois está sem sobrenome (João e João Silva).
+  function conflito(novo) {
+    var pn = chave(primeiroNome(novo)), so = novo.trim().indexOf(" ") < 0;
+    for (var i = 0; i < S.names.length; i++) {
+      var n = S.names[i];
+      if (chave(n) === chave(novo)) return n;
+      if (chave(primeiroNome(n)) === pn && (so || n.trim().indexOf(" ") < 0)) return n;
+    }
+    return null;
   }
   function removerNome(i) {
     var nm = S.names[i];
@@ -737,7 +767,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var auto = rankingAutomatico(r);
         if (auto && !r.closed) fecharComRanking(r, auto);
         break;
-      case "fechar3": if (r && !r.closed && r.winners.g1 !== undefined) { r.closed = true; salvar(); } break;
+      case "fechar3": if (r && !r.closed && (r.teams.length !== 3 || r.winners.g1 !== undefined)) { r.closed = true; salvar(); } break;
       case "reabrir": if (r && r.closed) reabrir(r); break;
       case "manual": ui.manual = []; break;
       case "mpick": ui.manual.push(+b.getAttribute("data-t")); break;
