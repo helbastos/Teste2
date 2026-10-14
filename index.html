@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Sorteio Vôlei">
+<meta name="apple-mobile-web-app-title" content="Vôlei dax Gayx">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#1F5FBF">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <!--APP-START-->
-<title>Sorteio do Vôlei</title>
+<title>Vôlei dax Gayx</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,10 +71,8 @@ h1 { font-size: 30px; line-height: 1; text-transform: uppercase; }
 h2 { font-size: 22px; text-transform: uppercase; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; }
 .brand { display: flex; align-items: center; gap: 10px; }
-.ballmark { width: 30px; height: 30px; border-radius: 50%; background: var(--ball); position: relative; flex: none; overflow: hidden; }
-.ballmark::before, .ballmark::after { content: ""; position: absolute; border: 2px solid var(--ball-ink); border-radius: 50%; opacity: .55; }
-.ballmark::before { width: 34px; height: 34px; left: -18px; top: -2px; }
-.ballmark::after { width: 34px; height: 34px; right: -18px; top: 6px; }
+.ballmark { width: 36px; height: 36px; flex: none; display: block; }
+.ballmark svg { width: 100%; height: 100%; display: block; }
 .tabs { display: flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
 .tabs button { flex: 1; border: 0; background: none; color: var(--muted); font: 600 15px var(--body); padding: 8px 10px; border-radius: 999px; cursor: pointer; }
 .tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
@@ -455,7 +453,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function render() {
     var r = ultima(), h = "";
     if (ui.view === "round" && !r) ui.view = "list";
-    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"></span><h1>Sorteio do Vôlei</h1></div></header>';
+    h += '<header class="top"><div class="brand"><span class="ballmark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><clipPath id="vb-ball"><circle cx="50" cy="50" r="46"/></clipPath><g clip-path="url(#vb-ball)"><clipPath id="vb-s0"><path d="M50 50 Q70.00 15.36 50.00 -30.00 L188.56 -30.00 L119.28 90.00 Q70.00 84.64 50 50 Z"/></clipPath><g clip-path="url(#vb-s0)" stroke="#10233D" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="110.62" cy="15.00" r="56" fill="#FF8C00"/><circle cx="110.62" cy="15.00" r="40" fill="#E40303"/></g><clipPath id="vb-s1"><path d="M50 50 Q70.00 84.64 119.28 90.00 L50.00 210.00 L-19.28 90.00 Q10.00 50.00 50 50 Z"/></clipPath><g clip-path="url(#vb-s1)" stroke="#10233D" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="50.00" cy="120.00" r="56" fill="#008026"/><circle cx="50.00" cy="120.00" r="40" fill="#FFED00"/></g><clipPath id="vb-s2"><path d="M50 50 Q10.00 50.00 -19.28 90.00 L-88.56 -30.00 L50.00 -30.00 Q70.00 15.36 50 50 Z"/></clipPath><g clip-path="url(#vb-s2)" stroke="#10233D" stroke-width="2.6"><rect x="-60" y="-60" width="220" height="220" fill="#FFFFFF" stroke="none"/><circle cx="-10.62" cy="15.00" r="56" fill="#750787"/><circle cx="-10.62" cy="15.00" r="40" fill="#004DFF"/></g><g fill="none" stroke="#10233D" stroke-width="2.6"><path d="M50 50 Q70.00 15.36 50.00 -30.00"/><path d="M50 50 Q70.00 84.64 119.28 90.00"/><path d="M50 50 Q10.00 50.00 -19.28 90.00"/></g></g><circle cx="50" cy="50" r="46" fill="none" stroke="#10233D" stroke-width="3.6"/></svg></span><h1>Vôlei dax Gayx</h1></div></header>';
     h += '<nav class="tabs" aria-label="Telas">' +
       '<button data-a="view" data-v="list" aria-pressed="' + (ui.view === "list") + '">Lista</button>' +
       '<button data-a="view" data-v="round" aria-pressed="' + (ui.view === "round") + '"' + (r ? "" : " disabled") + ">Rodada</button>" +
@@ -687,7 +685,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     h += '<p class="hint">Só rodadas com 4 times contam: 1º ganha 3, 2º ganha 2, 3º ganha 1, 4º ganha 0. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
     if (!lista.length) {
       h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o ranking de uma rodada.</span></div>';
-      return h + "</section>";
+      return h + "</section>" + painelBackup();
     }
     h += '<div class="tablewrap"><table class="pts"><thead><tr><th>#</th><th>Nome</th><th>Pts</th><th>Rod.</th><th>Média</th></tr></thead><tbody>';
     lista.forEach(function (s, i) {
@@ -696,7 +694,43 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     });
     h += "</tbody></table></div>";
     h += '<button class="btn danger" data-a="ask" data-s="zeropts">Zerar pontuação</button>';
+    return h + "</section>" + painelBackup();
+  }
+
+  // ---------- backup ----------
+  var PREFIXO = "VOLEI-BACKUP:";
+  function painelBackup() {
+    var h = '<section class="panel" aria-label="Backup"><h2>Backup</h2>';
+    h += '<p class="hint">Guarda lista, galera, pontos e histórico num texto. Mande para você mesmo no WhatsApp. Para passar para outro celular ou recuperar, cole o texto aqui embaixo.</p>';
+    h += '<div class="row"><button class="btn primary" data-a="bkEnviar">Enviar backup</button><button class="btn" data-a="bkCopiar">Copiar</button></div>';
+    h += '<textarea id="bkTexto" rows="2" placeholder="Cole aqui um backup para restaurar" aria-label="Backup para restaurar">' + esc(ui.bk || "") + "</textarea>";
+    h += '<button class="btn" data-a="bkRestaurar">Restaurar backup</button>';
     return h + "</section>";
+  }
+  function gerarBackup() {
+    var json = JSON.stringify({ v: 1, em: Date.now(), dados: S });
+    var d = new Date();
+    return "Backup do app Vôlei dax Gayx (" + d.toLocaleDateString("pt-BR") + "). Para restaurar: aba Pontos > Backup > colar.\n\n" +
+      PREFIXO + btoa(unescape(encodeURIComponent(json)));
+  }
+  function lerBackup(txt) {
+    var m = (txt || "").replace(/\s+/g, "").match(/VOLEI-BACKUP:([A-Za-z0-9+/=]+)/);
+    if (!m) return null;
+    try {
+      var o = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+      if (o && o.dados && Array.isArray(o.dados.names) && Array.isArray(o.dados.rounds)) return o;
+    } catch (e) {}
+    return null;
+  }
+  function copiar(txt) {
+    function plano() {
+      ui.bk = txt; render();
+      var t = document.getElementById("bkTexto"); if (t) { t.focus(); t.select(); }
+      toast("Não deu para copiar sozinho. O texto está no campo: segure e copie.");
+    }
+    try {
+      navigator.clipboard.writeText(txt).then(function () { toast("Backup copiado. Cole numa conversa sua no WhatsApp."); }, plano);
+    } catch (e) { plano(); }
   }
 
   function historico() {
@@ -761,6 +795,12 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       if (ui.renameErro) h += '<p class="hint" style="color:var(--warn)">' + esc(ui.renameErro) + "</p>";
       h += '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn primary" data-a="renomear">Salvar</button></div>';
       if (naGalera && !naLista) h += '<button class="btn danger" data-a="galeraDel">Tirar da galera</button>';
+    } else if (ui.sheet === "restore") {
+      var dd = ui.backup.dados, quando2 = new Date(ui.backup.em);
+      h += "<h2>Restaurar backup?</h2><p>Backup de " + quando2.toLocaleDateString("pt-BR") + " às " + quando2.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + ": " +
+        plural(Object.keys(dd.known || {}).length, "pessoa", "pessoas") + " na galera, " + plural(Object.keys(dd.scores || {}).length, "pessoa", "pessoas") + " com pontos e " +
+        plural(dd.rounds.length, "rodada", "rodadas") + ". Isso substitui tudo o que está neste aparelho.</p>";
+      h += '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn danger" data-a="bkAplicar">Restaurar</button></div>';
     } else if (ui.sheet === "zeropts") {
       h += "<h2>Zerar pontuação?</h2><p>Todo mundo volta para zero. Não dá para desfazer.</p>";
       h += '<div class="row"><button class="btn" data-a="close">Voltar</button><button class="btn danger" data-a="zeropts">Zerar</button></div>';
@@ -910,6 +950,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
 
   app.addEventListener("input", function (e) {
+    if (e.target.id === "bkTexto") ui.bk = e.target.value;
     if (e.target.id === "novo") {
       ui.draft = e.target.value;
       e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
@@ -951,6 +992,24 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "cancel": ui.sheet = null; if (pendente()) { S.rounds.pop(); salvar(); } ui.view = "list"; ui.manual = null; break;
       case "clear": ui.sheet = null; S.names = []; S.pairs = []; ui.sel = null; S.fromLast = false; salvar(); break;
       case "reset": ui.sheet = null; S.rounds = S.rounds.filter(function (x) { return !x.closed; }); salvar(); toast("Histórico zerado"); break;
+      case "bkEnviar":
+        var txt = gerarBackup();
+        if (navigator.share) {
+          navigator.share({ title: "Backup Vôlei dax Gayx", text: txt }).catch(function (err) { if (!err || err.name !== "AbortError") copiar(txt); });
+        } else copiar(txt);
+        return;
+      case "bkCopiar": copiar(gerarBackup()); return;
+      case "bkRestaurar":
+        var bkCampo = document.getElementById("bkTexto"), o = lerBackup(bkCampo ? bkCampo.value : "");
+        if (!o) { toast("Isso não parece um backup do app. Cole o texto inteiro que começa com VOLEI-BACKUP."); return; }
+        ui.backup = o; ui.sheet = "restore"; break;
+      case "bkAplicar":
+        try { localStorage.setItem(KEY, JSON.stringify(ui.backup.dados)); } catch (e) {}
+        S = carregar(); if (!S.known) S.known = {};
+        if (typeof ui.backup.dados.known === "object" && ui.backup.dados.known) S.known = ui.backup.dados.known;
+        salvar();
+        ui.sheet = null; ui.backup = null; ui.bk = ""; ui.view = pendente() ? "round" : "list";
+        toast("Backup restaurado"); break;
       case "zeropts": ui.sheet = null; S.scores = {}; salvar(); toast("Pontuação zerada"); break;
       case "win":
         if (!r || r.closed) return;

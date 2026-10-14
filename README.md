@@ -1,4 +1,4 @@
-# Sorteio do Vôlei
+# Vôlei dax Gayx
 
 App para sortear times de vôlei em quartetos. Funciona no iPhone como app de tela inicial (sem App Store) e offline.
 
@@ -48,3 +48,7 @@ Nome repetido não entra. Se dois têm o mesmo primeiro nome, os dois precisam d
 ## Publicar (GitHub Pages)
 
 Settings > Pages > Deploy from a branch > `main` / root. GitHub Pages em repositório privado exige plano pago; em repositório público é grátis.
+
+## Backup
+
+Aba Pontos > Backup > Enviar backup gera um texto com lista, galera, pontos e histórico. Mande para você mesmo no WhatsApp. Para restaurar (outro celular ou depois de perder os dados), cole o texto no mesmo lugar e toque em Restaurar backup.
