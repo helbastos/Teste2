@@ -431,6 +431,9 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     }
   }
   // Quem esteve em quadra pelo time ti no jogo g: o time sorteado, menos quem saiu, mais quem entrou.
+  var MAX_QUADRA = 4;
+  // Times com mais gente em quadra do que cabe (dupla de revezamento sem escolher quem jogou).
+  function excesso(r, g) { return lados(r, g).filter(function (ti) { return ti !== null && emQuadra(r, g, ti).length > MAX_QUADRA; }); }
   function ajuste(r, g, ti) { return (r.esc && r.esc[g] && r.esc[g][ti]) || null; }
   function emQuadra(r, g, ti) {
     var aj = ajuste(r, g, ti), sai = {};
@@ -683,7 +686,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       var aj = ti === null ? null : ajuste(r, g, ti);
       if (!aj || (!aj.add.length && !aj.rem.length)) return;
       var t = [];
-      if (aj.rem.length) t.push("saiu " + aj.rem.join(", "));
+      if (aj.rem.length) t.push(aj.rem.join(" e ") + (aj.rem.length === 1 ? " não estava em quadra" : " não estavam em quadra"));
       if (aj.add.length) t.push("entrou " + aj.add.join(", "));
       partes.push("Time " + (ti + 1) + ": " + t.join("; "));
     });
@@ -899,12 +902,16 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       h += '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn primary" data-a="renomear">Salvar</button></div>';
       if (naGalera && !naLista) h += '<button class="btn danger" data-a="galeraDel">Tirar da galera</button>';
     } else if (ui.sheet === "esc") {
-      var rr = ultima(), gg = ui.escG, ls = lados(rr, gg);
-      h += "<h2>" + ROTULO[gg] + ": quem jogou</h2><p>Toque em quem saiu para riscar. Quem entrou ganha o ponto se o time vencer e o jogo conta para ela. Os times sorteados não mudam.</p>";
+      var rr = ultima(), gg = ui.escG, ls = lados(rr, gg), pend = ui.pendingWin && ui.pendingWin.g === gg ? ui.pendingWin : null;
+      h += "<h2>" + ROTULO[gg] + ": quem jogou</h2>";
+      if (pend && excesso(rr, gg).length) h += '<p class="ajuste">Antes de marcar o placar: cada time joga com no máximo ' + MAX_QUADRA + '. Risque quem não estava em quadra.</p>';
+      h += "<p>Toque em quem não estava em quadra para riscar. Quem entrou ganha o ponto se o time vencer e o jogo conta para ela. Os times sorteados não mudam.</p>";
       ls.forEach(function (ti, lado_i) {
-        var aj = ajuste(rr, gg, ti) || { add: [], rem: [] }, sai = {};
+        var aj = ajuste(rr, gg, ti) || { add: [], rem: [] }, sai = {}, qtd = emQuadra(rr, gg, ti).length;
         aj.rem.forEach(function (n) { sai[chave(n)] = 1; });
-        h += '<div class="ask"><p><b>Time ' + (ti + 1) + "</b></p><div class=\"chips\">";
+        h += '<div class="ask"><p><b>Time ' + (ti + 1) + "</b> · " + qtd + " em quadra</p>";
+        if (qtd > MAX_QUADRA) h += '<p class="ajuste">Tem ' + qtd + " em quadra. Risque " + (qtd - MAX_QUADRA === 1 ? "quem não jogou." : (qtd - MAX_QUADRA) + " que não jogaram.") + "</p>";
+        h += '<div class="chips">';
         pessoas(rr.teams[ti]).forEach(function (n) {
           h += '<button class="chip pick' + (sai[chave(n)] ? " strike" : "") + '" data-a="escRem" data-t="' + ti + '" data-n="' + esc(n) + '">' + esc(n) + "</button>";
         });
@@ -912,12 +919,14 @@ details.hist summary { cursor: pointer; font-weight: 600; }
           h += '<span class="chip duo">+ ' + esc(n) + '<button class="x" data-a="escDel" data-t="' + ti + '" data-n="' + esc(n) + '" aria-label="Tirar ' + esc(n) + '">×</button></span>';
         });
         h += "</div>";
-        if (ui.escAdd === ti) {
+        if (qtd >= MAX_QUADRA) {
+          h += '<p class="hint">Já tem ' + MAX_QUADRA + " em quadra. Para colocar alguém, risque quem saiu.</p>";
+        } else if (ui.escAdd === ti) {
           var outro = ls[1 - lado_i], ocupados = {};
           emQuadra(rr, gg, ti).concat(emQuadra(rr, gg, outro), pessoas(rr.teams[ti])).forEach(function (n) { ocupados[chave(n)] = 1; });
           var cand = S.names.concat(Object.keys(S.known).map(function (k) { return S.known[k].name; }))
             .filter(function (n, i, arr) { return !ocupados[chave(n)] && arr.findIndex(function (x) { return chave(x) === chave(n); }) === i; });
-          h += '<p class="hint">Quem entrou?</p><div class="chips">' + cand.map(function (n) {
+          h += '<p class="hint">Quem entrou? Cabe' + (MAX_QUADRA - qtd === 1 ? " mais 1." : "m mais " + (MAX_QUADRA - qtd) + ".") + '</p><div class="chips">' + cand.map(function (n) {
             return '<button class="chip pick" data-a="escAdd" data-t="' + ti + '" data-n="' + esc(n) + '">+ ' + esc(n) + "</button>";
           }).join("") + "</div>";
           h += '<div class="adder"><textarea id="escNovo" rows="1" placeholder="Ou digite um nome" aria-label="Nome de quem entrou"></textarea><button class="btn" data-a="escNovo" data-t="' + ti + '">Adicionar</button></div>';
@@ -926,7 +935,12 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         }
         h += "</div>";
       });
-      h += '<button class="btn primary block" data-a="close">Pronto</button>';
+      if (pend) {
+        var ok = !excesso(rr, gg).length;
+        h += '<div class="row"><button class="btn" data-a="close">Cancelar</button><button class="btn ball" data-a="escPronto"' + (ok ? "" : " disabled") + ">Marcar vitória do Time " + (pend.t + 1) + "</button></div>";
+      } else {
+        h += '<button class="btn primary block" data-a="escPronto">Pronto</button>';
+      }
     } else if (ui.sheet === "restore") {
       var dd = ui.backup.dados, quando2 = new Date(ui.backup.em);
       h += "<h2>Restaurar backup?</h2><p>Backup de " + quando2.toLocaleDateString("pt-BR") + " às " + quando2.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + ": " +
@@ -1113,8 +1127,14 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var eti = +b.getAttribute("data-t"), en = b.getAttribute("data-n");
         r.esc = r.esc || {}; r.esc[ui.escG] = r.esc[ui.escG] || {};
         var eaj = r.esc[ui.escG][eti] || (r.esc[ui.escG][eti] = { add: [], rem: [] });
+        var cheio = emQuadra(r, ui.escG, eti).length >= MAX_QUADRA;
+        if ((a === "escAdd" || a === "escNovo") && cheio) { toast("Já tem " + MAX_QUADRA + " em quadra. Risque quem saiu antes."); return; }
         var semEle = function (arr, n) { return arr.filter(function (x) { return chave(x) !== chave(n); }); };
-        if (a === "escRem") eaj.rem = eaj.rem.some(function (x) { return chave(x) === chave(en); }) ? semEle(eaj.rem, en) : eaj.rem.concat([en]);
+        if (a === "escRem") {
+          var riscado = eaj.rem.some(function (x) { return chave(x) === chave(en); });
+          if (riscado && cheio) { toast("Já tem " + MAX_QUADRA + " em quadra. Risque outra pessoa antes."); return; }
+          eaj.rem = riscado ? semEle(eaj.rem, en) : eaj.rem.concat([en]);
+        }
         if (a === "escAdd") eaj.add.push(en);
         if (a === "escDel") eaj.add = semEle(eaj.add, en);
         if (a === "escNovo") {
@@ -1142,7 +1162,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "undo": S.pairs.splice(+b.getAttribute("data-i"), 1); salvar(); break;
       case "mode": S.mode = b.getAttribute("data-v") === "rank" ? "rank" : "random"; salvar(); break;
       case "ask": ui.sheet = b.getAttribute("data-s"); break;
-      case "close": ui.sheet = null; break;
+      case "close": ui.sheet = null; ui.pendingWin = null; break;
       case "draw": ui.sheet = null; if (prontoParaSortear() && !pendente()) sortear(); window.scrollTo(0, 0); break;
       case "cancel": ui.sheet = null; if (pendente()) { S.rounds.pop(); salvar(); } ui.view = "list"; ui.manual = null; break;
       case "clear": ui.sheet = null; S.names = []; S.pairs = []; ui.sel = null; S.fromLast = false; salvar(); break;
@@ -1168,8 +1188,18 @@ details.hist summary { cursor: pointer; font-weight: 600; }
       case "zeropts": ui.sheet = null; S.scores = {}; salvar(); toast("Pontuação zerada"); break;
       case "win":
         if (!r || r.closed) return;
-        r.winners[b.getAttribute("data-g")] = +b.getAttribute("data-t");
+        var wg = b.getAttribute("data-g"), wt = +b.getAttribute("data-t");
+        // Com mais de 4 em quadra (dupla de revezamento), primeiro escolhe quem jogou.
+        if (excesso(r, wg).length) { ui.escG = wg; ui.escAdd = null; ui.pendingWin = { g: wg, t: wt }; ui.sheet = "esc"; break; }
+        r.winners[wg] = wt;
         limparInvalidos(r); salvar(); break;
+      case "escPronto":
+        var pw = ui.pendingWin;
+        if (pw && r && !r.closed) {
+          if (excesso(r, pw.g).length) { toast("Ainda tem time com mais de " + MAX_QUADRA + " em quadra."); return; }
+          r.winners[pw.g] = pw.t; limparInvalidos(r); salvar();
+        }
+        ui.pendingWin = null; ui.sheet = null; break;
       case "rankok":
         var auto = rankingAutomatico(r);
         if (auto && !r.closed) fecharComRanking(r, auto);
