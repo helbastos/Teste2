@@ -26,7 +26,7 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
 
 Em cada jogo, "Alguém saiu ou entrou neste jogo?" permite riscar quem saiu e adicionar quem entrou (substituto, quem completou o time ou alguém de fora da lista). Os times sorteados não mudam. Quem jogou ganha o ponto se o time vencer e o jogo conta para ela.
 
-Cada time tem no máximo 4 em quadra por jogo. Com dupla de revezamento, ao marcar o placar o app pede para riscar quem não jogou. Com 4 em quadra não dá para adicionar ninguém sem antes riscar alguém.
+Cada time tem no máximo 4 em quadra por jogo. Com dupla de revezamento, ao marcar o placar o app pede para riscar quem não jogou. Com 3 ou 4 times, todo time joga com exatamente 4: se um time estiver com menos, ao marcar o placar o app pede para adicionar quem completou. Com 4 em quadra não dá para adicionar ninguém sem antes riscar alguém.
 
 ## Lista de presença do WhatsApp
 
