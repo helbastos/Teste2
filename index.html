@@ -639,7 +639,9 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     t.forEach(function (u) { h += '<li class="' + (u.length > 1 ? "duo" : "") + '">' + esc(nomeUnidade(u)) + "</li>"; });
     h += "</ol>";
     var maior = Math.max.apply(null, r.teams.map(function (x) { return x.length; }));
-    if (t.length < maior) h += '<span class="tag">' + plural(t.length, "jogador", "jogadores") + ", completa no par ou ímpar</span>";
+    var faltam = MAX_QUADRA - t.length;
+    if (r.teams.length >= 3 && faltam > 0) h += '<span class="tag">' + plural(t.length, "jogador", "jogadores") + " · " + (faltam === 1 ? "1 completa" : faltam + " completam") + " no par ou ímpar</span>";
+    else if (t.length < maior) h += '<span class="tag">' + plural(t.length, "jogador", "jogadores") + "</span>";
     return h + "</article>";
   }
   function nomeCurto(r, n) {
