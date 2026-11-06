@@ -260,6 +260,16 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     S.pontosV3 = true;
     salvar();
   }
+  // Pontuação sem data da última vez que a pessoa foi: pega das rodadas guardadas (ou hoje, para não sumir ninguém).
+  (function datarPontos() {
+    var mudou = false;
+    for (var k in S.scores) if (!S.scores[k].last) {
+      var ult = 0;
+      S.rounds.forEach(function (r) { if (pessoas([].concat.apply([], r.teams)).some(function (n) { return chave(n) === k; })) ult = Math.max(ult, Date.parse(r.date) || 0); });
+      S.scores[k].last = ult || Date.now(); mudou = true;
+    }
+    if (mudou) salvar();
+  })();
   // Limpa sobras de quando o cabeçalho da lista do WhatsApp entrava como nome.
   (function limparLixo() {
     function lixo(n) { return linhaDeCabecalho(n) || !pareceNome(limparNome(semEmoji(n))) || /^(suplentes?|obs|quadra)\b/i.test(semEmoji(n).trim()); }
@@ -379,7 +389,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     S.rounds.push(r);
     if (S.rounds.length > 40) S.rounds = S.rounds.slice(-40);
     S.fromLast = false;
-    S.names.forEach(function (n) { lembrarEm(S.known, n, Date.now(), true); });
+    S.names.forEach(function (n) { lembrarEm(S.known, n, Date.now(), true); var sc = S.scores[chave(n)]; if (sc) sc.last = Date.now(); });
     salvar();
     ui.view = "round"; ui.manual = null;
   }
@@ -493,6 +503,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (sinal > 0) r.pts = pts;
     for (var k in pts) {
       var x = pts[k], s = S.scores[k] || (S.scores[k] = { name: x.name, pts: 0, jogos: 0, rounds: 0 });
+      if (sinal > 0) s.last = Math.max(s.last || 0, Date.parse(r.date) || Date.now());
       s.name = x.name; s.pts += sinal * x.pts; s.jogos = (s.jogos || 0) + sinal * x.jogos; s.rounds = (s.rounds || 0) + sinal;
       if (s.jogos <= 0) delete S.scores[k];
     }
@@ -774,17 +785,21 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     return h + "</section>";
   }
 
+  var DIAS_NO_RANKING = 60; // quem fica esse tempo sem ir sai da classificação (os pontos continuam guardados)
   var MIN_JOGOS = 6; // abaixo disso a média ainda diz pouco (6 jogos = 3 rodadas completas com 4 times)
   function telaPontos() {
-    var lista = Object.keys(S.scores).map(function (k) { return S.scores[k]; }).filter(function (s) { return (s.jogos || 0) > 0; });
+    var limite = Date.now() - DIAS_NO_RANKING * 864e5;
+    var todos = Object.keys(S.scores).map(function (k) { return S.scores[k]; }).filter(function (s) { return (s.jogos || 0) > 0; });
+    var lista = todos.filter(function (s) { return (s.last || 0) >= limite; }), sumidos = todos.length - lista.length;
     function med(s) { return s.pts / s.jogos; }
     lista.sort(function (a, b) { return med(b) - med(a) || b.jogos - a.jogos || b.pts - a.pts || a.name.localeCompare(b.name); });
     var dentro = lista.filter(function (s) { return s.jogos >= MIN_JOGOS; }), entrando = lista.filter(function (s) { return s.jogos < MIN_JOGOS; });
     var h = '<section class="panel" aria-label="Pontuação"><h2>Classificação</h2>';
-    h += '<p class="hint">Ordenada pela média de pontos por jogo, a mesma que o sorteio usa. Assim quem foi menos vezes não sai prejudicado. Entra na classificação quem tem pelo menos ' + MIN_JOGOS + ' jogos.</p>';
+    h += '<p class="hint">Ordenada pela média de pontos por jogo, a mesma que o sorteio usa. Assim quem foi menos vezes não sai prejudicado. Entra na classificação quem tem pelo menos ' + MIN_JOGOS + ' jogos e jogou nos últimos 2 meses.</p>';
     h += '<p class="hint">Cada vitória vale 1 ponto. Com 4 times, quem é do time campeão e ganhou os dois jogos leva +1 de bônus. Rodadas com 2 times não contam.</p>';
     if (!lista.length) {
-      h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o resultado de uma rodada.</span></div>';
+      h += '<div class="empty"><span>' + (sumidos ? "Ninguém jogou nos últimos 2 meses. Os pontos antigos continuam guardados e voltam quando a pessoa jogar de novo."
+        : "Ainda não tem pontos. Eles aparecem quando você confirma o resultado de uma rodada.") + "</span></div>";
       return h + "</section>" + painelBackup();
     }
     function tabela(arr, numerar) {
@@ -796,6 +811,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     }
     if (dentro.length) h += tabela(dentro, true);
     else h += '<div class="empty"><span>Ninguém tem ' + MIN_JOGOS + ' jogos ainda.</span></div>';
+    if (sumidos) h += '<p class="hint">' + (sumidos === 1 ? "1 pessoa não aparece por estar" : sumidos + " pessoas não aparecem por estarem") + " há mais de 2 meses sem jogar. Os pontos continuam guardados e voltam quando jogar de novo.</p>";
     if (entrando.length) {
       h += '<h3 class="sub">Ainda entrando no ranking</h3><p class="hint">Menos de ' + MIN_JOGOS + " jogos.</p>" + tabela(entrando, false);
     }

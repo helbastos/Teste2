@@ -20,7 +20,7 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
 - 4 times: quem é do time campeão sorteado e ganhou os dois jogos leva +1 de bônus. Para quem joga a rodada inteira isso dá 1º = 3, 2º = 1, 3º = 1, 4º = 0.
 - 3 times: 1 por vitória, sem bônus.
 - 2 times: não pontua.
-- A classificação (aba Pontos) é pela média de pontos por jogo, a mesma que o sorteio usa. Só entra quem tem pelo menos 6 jogos; quem tem menos aparece em "Ainda entrando no ranking".
+- A classificação (aba Pontos) é pela média de pontos por jogo, a mesma que o sorteio usa. Só entra quem tem pelo menos 6 jogos; quem tem menos aparece em "Ainda entrando no ranking". Quem fica mais de 2 meses sem ir sai da classificação, mas os pontos ficam guardados e voltam quando a pessoa jogar de novo.
 
 ### Trocas durante a rodada
 
