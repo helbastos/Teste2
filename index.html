@@ -76,7 +76,8 @@ table.pts th:nth-child(2), table.pts td:nth-child(2) { text-align: left; width: 
 table.pts td:first-child { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--muted); }
 table.pts td.big { font-family: var(--display); font-weight: 700; font-size: 20px; }
 table.pts tr:first-child td:first-child { color: var(--ball-ink); }
-table.pts tbody tr:first-child td:first-child span { background: var(--ball); border-radius: 6px; padding: 0 6px; }
+h3.sub { font-size: 18px; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+table.pts tbody tr:first-child td:first-child span:not(:empty) { background: var(--ball); border-radius: 6px; padding: 0 6px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .counter { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .count { font-family: var(--display); font-weight: 700; font-size: 64px; line-height: .85; font-variant-numeric: tabular-nums; }
@@ -710,21 +711,31 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     return h + "</section>";
   }
 
+  var MIN_RODADAS = 3; // abaixo disso a média ainda diz pouco, então a pessoa fica fora da classificação principal
   function telaPontos() {
     var lista = Object.keys(S.scores).map(function (k) { return S.scores[k]; }).filter(function (s) { return s.rounds > 0; });
-    lista.sort(function (a, b) { return b.pts - a.pts || b.pts / b.rounds - a.pts / a.rounds || a.name.localeCompare(b.name); });
-    var h = '<section class="panel" aria-label="Pontuação"><h2>Pontuação</h2>';
-    h += '<p class="hint">4 times: 1º ganha 3, 2º e 3º ganham 1, 4º ganha 0. 3 times: cada vitória vale 1. 2 times não contam. A média por rodada é o que o sorteio usa para equilibrar, assim quem foi menos vezes não sai prejudicado.</p>';
+    function med(s) { return s.pts / s.rounds; }
+    lista.sort(function (a, b) { return med(b) - med(a) || b.rounds - a.rounds || b.pts - a.pts || a.name.localeCompare(b.name); });
+    var dentro = lista.filter(function (s) { return s.rounds >= MIN_RODADAS; }), entrando = lista.filter(function (s) { return s.rounds < MIN_RODADAS; });
+    var h = '<section class="panel" aria-label="Pontuação"><h2>Classificação</h2>';
+    h += '<p class="hint">Ordenada pela média de pontos por rodada, a mesma que o sorteio usa. Assim quem foi menos vezes não sai prejudicado. Entra na classificação quem tem pelo menos ' + MIN_RODADAS + ' rodadas.</p>';
+    h += '<p class="hint">4 times: 1º ganha 3, 2º e 3º ganham 1, 4º ganha 0. 3 times: cada vitória vale 1. 2 times não contam.</p>';
     if (!lista.length) {
-      h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o ranking de uma rodada.</span></div>';
+      h += '<div class="empty"><span>Ainda não tem pontos. Eles aparecem quando você confirma o resultado de uma rodada.</span></div>';
       return h + "</section>" + painelBackup();
     }
-    h += '<div class="tablewrap"><table class="pts"><thead><tr><th>#</th><th>Nome</th><th>Pts</th><th>Rod.</th><th>Média</th></tr></thead><tbody>';
-    lista.forEach(function (s, i) {
-      h += "<tr><td><span>" + (i + 1) + "</span></td><td>" + esc(s.name) + '</td><td class="big">' + s.pts + "</td><td>" + s.rounds + "</td><td>" +
-        (s.pts / s.rounds).toFixed(1).replace(".", ",") + "</td></tr>";
-    });
-    h += "</tbody></table></div>";
+    function tabela(arr, numerar) {
+      var t = '<div class="tablewrap"><table class="pts"><thead><tr><th>#</th><th>Nome</th><th>Média</th><th>Pts</th><th>Rod.</th></tr></thead><tbody>';
+      arr.forEach(function (s, i) {
+        t += "<tr><td><span>" + (numerar ? i + 1 : "") + "</span></td><td>" + esc(s.name) + '</td><td class="big">' + med(s).toFixed(2).replace(".", ",") + "</td><td>" + s.pts + "</td><td>" + s.rounds + "</td></tr>";
+      });
+      return t + "</tbody></table></div>";
+    }
+    if (dentro.length) h += tabela(dentro, true);
+    else h += '<div class="empty"><span>Ninguém tem ' + MIN_RODADAS + ' rodadas ainda.</span></div>';
+    if (entrando.length) {
+      h += '<h3 class="sub">Ainda entrando no ranking</h3><p class="hint">Menos de ' + MIN_RODADAS + " rodadas.</p>" + tabela(entrando, false);
+    }
     h += '<button class="btn danger" data-a="ask" data-s="zeropts">Zerar pontuação</button>';
     return h + "</section>" + painelBackup();
   }
