@@ -30,7 +30,7 @@ Cada time tem no máximo 4 em quadra por jogo. Com dupla de revezamento, ao marc
 
 ## Lista de presença do WhatsApp
 
-Cole a lista inteira no campo de nomes. O app pega só as linhas numeradas ("1 - Ana"), ignora cabeçalho, emojis e números vazios, separa os suplentes e confere cada nome com a galera (sem ligar para acento ou maiúscula). Se vier só o primeiro nome e ele bater com alguém da galera, o app pergunta se é a mesma pessoa ou um novato. Você escolhe entre usar todos ou só a lista principal. Quem você tirar da lista vai para o topo da galera.
+Cole a lista inteira no campo de nomes. O app pega só as linhas numeradas ("1 - Ana"), ignora cabeçalho, emojis e números vazios, separa os suplentes e confere cada nome com a galera e com o ranking (sem ligar para acento ou maiúscula), inclusive quem já saiu da galera. Se vier só o primeiro nome e ele bater com alguém da galera, o app pergunta se é a mesma pessoa ou um novato. Você escolhe entre usar todos ou só a lista principal. Quem você tirar da lista vai para o topo da galera.
 
 ## Nomes
 

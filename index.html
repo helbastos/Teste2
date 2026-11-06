@@ -989,6 +989,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var partes = (campo ? campo.value : "").split(/[\n,;]+/).filter(function (l) { return !linhaDeCabecalho(semCarimbo(l)); }).map(function (l) { return limparNome(semEmoji(semCarimbo(l))); }).filter(pareceNome);
     var barrados = [], novos = 0;
     partes.forEach(function (p) {
+      p = nomeSalvo(p) || p;
       if (conflito(p)) barrados.push(p); else { S.names.push(p); lembrarEm(S.known, p, Date.now(), false); voltou(p); novos++; }
     });
     // Quem foi barrado continua no campo para a pessoa completar o sobrenome.
@@ -1032,12 +1033,24 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   }
   // Nome igual ao da galera (sem ligar para acento) entra direto. Nome simples que bate com o primeiro nome
   // de alguém da galera vira pergunta, porque pode ser um novato xará.
+  // Todo mundo que o app já conhece: a galera e quem tem pontos (inclusive quem está fora da classificação).
+  function conhecidos() {
+    var vistos = {}, out = [];
+    [S.known, S.scores].forEach(function (m) { for (var k in m) if (!vistos[k]) { vistos[k] = 1; out.push(m[k].name); } });
+    return out;
+  }
+  // Mesmo nome sem ligar para acento ou maiúscula: devolve a grafia já salva.
+  function nomeSalvo(nome) {
+    var alvo = semAcento(nome), lista = conhecidos();
+    for (var i = 0; i < lista.length; i++) if (semAcento(lista[i]) === alvo) return lista[i];
+    return null;
+  }
   function casarComGalera(nome) {
-    var alvo = semAcento(nome), ks = Object.keys(S.known), i;
-    for (i = 0; i < ks.length; i++) if (semAcento(S.known[ks[i]].name) === alvo) return { nome: S.known[ks[i]].name, conhecido: true };
+    var salvo = nomeSalvo(nome), alvo = semAcento(nome);
+    if (salvo) return { nome: salvo, conhecido: true };
     if (alvo.indexOf(" ") < 0) {
-      var mesmos = ks.filter(function (k) { return semAcento(primeiroNome(S.known[k].name)) === alvo; });
-      if (mesmos.length) return { opcoes: mesmos.map(function (k) { return S.known[k].name; }).sort() };
+      var mesmos = conhecidos().filter(function (n) { return semAcento(primeiroNome(n)) === alvo; });
+      if (mesmos.length) return { opcoes: mesmos.sort() };
     }
     return { nome: nome, conhecido: false };
   }
