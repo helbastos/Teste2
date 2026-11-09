@@ -14,6 +14,12 @@ App para sortear times de vôlei em quartetos. Funciona no iPhone como app de te
 - Nos dois modos o sorteio evita repetir parceiros das rodadas recentes (nunca 3 do mesmo time anterior juntos) e, como critério secundário, evita que quem estava descansando no último jogo fique parado também no primeiro jogo da rodada seguinte.
 - Antes de cada sorteio o app confirma a lista. Antes de um novo sorteio, pede o resultado da rodada.
 
+## Rodadas fora do padrão
+
+- **Montar times na mão:** na Lista, além de Sortear, dá para montar os times tocando no número do time ao lado de cada nome. Serve quando o sorteio foi feito fora do app. Quem ficar sem time não joga a rodada.
+- **Editar os times:** enquanto nenhum placar da rodada foi marcado, dá para mexer nos times.
+- **Encerrar a rodada agora:** quando o número de times muda no meio (alguém foi embora ou chegou gente). Os jogos já marcados contam 1 ponto por vitória, sem bônus. Depois é só sortear ou montar a rodada nova; a montagem já começa com os times da rodada encerrada.
+
 ## Pontuação
 
 - Cada vitória vale 1 ponto, para quem estava em quadra naquele jogo.
