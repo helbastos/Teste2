@@ -585,7 +585,11 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     if (need > 0 || S.pairs.length) h += painelDuplas(need);
 
     if (pendente()) {
-      h += '<div class="notice">A rodada atual ainda não foi encerrada. Registre os jogos antes de sortear de novo.</div>';
+      var rAberta = pendente(), semPlacar = !Object.keys(rAberta.winners).length;
+      h += '<div class="notice">A rodada atual ainda está aberta. Se mudou quem está jogando (alguém foi embora ou chegou), ' +
+        (semPlacar ? "edite os times ou encerre a rodada." : "encerre a rodada: os jogos já marcados continuam valendo.") + "</div>";
+      if (semPlacar) h += '<button class="btn block" data-a="montar" data-v="editar">Editar os times</button>';
+      h += '<button class="btn block" data-a="ask" data-s="parcial">Encerrar a rodada agora</button>';
       h += '<button class="btn primary block" data-a="view" data-v="round">Ver rodada atual</button>';
     } else {
       h += '<section class="panel" aria-label="Tipo de sorteio"><div class="mode">' +
@@ -637,17 +641,37 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function iniciarMontagem(editar) {
     var r = ultima(), us = [], vistos = {};
     function poe(u) { var k = chaveUnidade(u); if (!vistos[k]) { vistos[k] = 1; us.push(u); } }
-    var atrib = {};
-    if (editar && r) r.teams.forEach(function (t, ti) { t.forEach(function (u) { poe(u); atrib[chaveUnidade(u)] = ti; }); });
-    unidades().forEach(poe);
-    // Rodada anterior encerrada antes do fim: começa com os times dela, para só redistribuir quem mudou.
-    if (!editar && r && r.parcial) {
-      var naLista = {}; us.forEach(function (u) { naLista[chaveUnidade(u)] = 1; });
-      r.teams.forEach(function (t, ti) { t.forEach(function (u) { var k = chaveUnidade(u); if (naLista[k]) atrib[k] = ti; }); });
+    var atrib = {}, presente = {};
+    S.names.forEach(function (n) { presente[chave(n)] = 1; });
+    // Só quem ainda está na lista: quem foi tirado da lista foi embora e não entra na montagem.
+    function naLista(u) {
+      var ficam = u.filter(function (n) { return presente[chave(n)]; });
+      return ficam.length === u.length ? u : ficam.length ? ficam : null;
     }
-    var T = editar && r ? r.teams.length : Math.max(2, Math.min(4, tamanhos(us.length).length || 2));
+    // Ao editar a rodada aberta, ou depois de encerrar uma no meio, começa com os times dela.
+    var base = r && (editar ? !r.closed : r.parcial) ? r : null;
+    if (base) base.teams.forEach(function (t, ti) {
+      t.forEach(function (u) { var v = naLista(u); if (v) { poe(v); atrib[chaveUnidade(v)] = ti; } });
+    });
+    unidades().forEach(poe);
+    var T = Math.max(2, Math.min(4, tamanhos(us.length).length || 2));
+    if (editar && base && Math.ceil(us.length / MAX_QUADRA) >= base.teams.length) T = base.teams.length;
     ui.montagem = { editar: !!editar, T: T, us: us, atrib: atrib };
+    encaixarSobras();
     ui.view = "montar";
+  }
+  // Quem estava num time que deixou de existir (ex.: de 3 para 2 times) vai para as vagas abertas, na ordem.
+  function encaixarSobras() {
+    var m = ui.montagem, qtd = [];
+    for (var i = 0; i < m.T; i++) qtd.push(0);
+    m.us.forEach(function (u) { var ti = m.atrib[chaveUnidade(u)]; if (ti !== undefined && ti < m.T) qtd[ti]++; });
+    m.us.forEach(function (u) {
+      var k = chaveUnidade(u), ti = m.atrib[k];
+      if (ti === undefined || ti < m.T) return;
+      var vaga = qtd.findIndex(function (q) { return q < MAX_QUADRA; });
+      if (vaga < 0) { delete m.atrib[k]; return; }
+      m.atrib[k] = vaga; qtd[vaga]++;
+    });
   }
   function timesMontados() {
     var m = ui.montagem, times = [];
@@ -1389,7 +1413,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var editar = b.getAttribute("data-v") === "editar";
         if (editar ? !(r && !r.closed && !Object.keys(r.winners).length) : pendente()) return;
         iniciarMontagem(editar); window.scrollTo(0, 0); break;
-      case "mT": ui.montagem.T = +b.getAttribute("data-v"); break;
+      case "mT": ui.montagem.T = +b.getAttribute("data-v"); encaixarSobras(); break;
       case "mSet":
         var mk = b.getAttribute("data-k"), mt = +b.getAttribute("data-t");
         if (ui.montagem.atrib[mk] === mt) delete ui.montagem.atrib[mk]; else ui.montagem.atrib[mk] = mt;
