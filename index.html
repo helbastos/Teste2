@@ -228,7 +228,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   // Pesos do sorteio. Repetir parceiro pesa mais que ficar parado; 3 ou mais do mesmo time anterior quase nunca acontece.
   var PESO_REPETICAO = 1, PESO_TRIO = 50, PESO_ESPERA = 0.3, PESO_EQUILIBRIO = 25;
 
-  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "random", modoPadraoV2: true, pontosV2: false, pontosV3: false, known: null }; }
+  function padrao() { return { names: [], pairs: [], rounds: [], fromLast: false, scores: {}, mode: "random", modoPadraoV2: true, pontosV2: false, pontosV3: false, pontos2Times: false, known: null }; }
   function carregar() {
     try {
       var r = JSON.parse(localStorage.getItem(KEY));
@@ -265,6 +265,12 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     S.scores = {};
     S.rounds.forEach(function (r) { delete r.pts; if (r.closed) aplicarPontos(r, 1); });
     S.pontosV3 = true;
+    salvar();
+  }
+  // Rodadas de 2 times passaram a pontuar: aplica nas já encerradas que têm o vencedor marcado, uma vez.
+  if (!S.pontos2Times) {
+    S.rounds.forEach(function (r) { if (r.closed && r.teams.length === 2 && !r.pts && r.winners.g1 !== undefined) aplicarPontos(r, 1); });
+    S.pontos2Times = true;
     salvar();
   }
   // Pontuação sem data da última vez que a pessoa foi: pega das rodadas guardadas (ou hoje, para não sumir ninguém).
@@ -482,10 +488,8 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function tresCompletos(r) { return ["g1", "g2", "g3"].every(function (g) { return r.winners[g] !== undefined; }); }
   // Pontos de cada pessoa na rodada, jogo a jogo: 1 por vitória. Com 4 times, +1 de bônus para quem é do time
   // campeão sorteado e esteve em quadra nas duas vitórias. Para quem joga a rodada inteira isso dá 3/1/1/0.
-  // Rodada com 2 times não pontua.
   function pontosDaRodada(r) {
     var T = r.teams.length, defs = FORMATO[T], out = {};
-    if (T === 2) return null;
     function soma(n, p, j) { var k = chave(n), o = out[k] || (out[k] = { name: n, pts: 0, jogos: 0 }); o.name = n; o.pts += p; o.jogos += j; }
     // Rodada encerrada antes do fim: só os jogos com vencedor marcado, 1 por vitória, sem bônus.
     if (r.parcial) {
@@ -814,13 +818,19 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     for (var g in r.winners) v[r.winners[g]]++;
     return v;
   }
+  function resumoVitorias(r) {
+    var v = vitoriasPorTime(r);
+    return '<div class="rank">' + r.teams.map(function (t, ti) { return ti; }).sort(function (a, b) { return v[b] - v[a] || a - b; }).map(function (ti) {
+      return '<div class="rank-row"><span class="pos">+' + v[ti] + '</span><span class="who"><b>Time ' + (ti + 1) + " · " + plural(v[ti], "vitória", "vitórias") + "</b>" + esc(resumoTime(r, ti)) + "</span></div>";
+    }).join("") + "</div>";
+  }
   function secaoParcial(r) {
     var v = vitoriasPorTime(r), marcados = Object.keys(r.winners).length;
     var h = '<section class="panel" aria-label="Rodada encerrada"><h2>Encerrada antes do fim</h2>';
-    h += '<p class="hint">' + (r.teams.length === 2 ? "Rodadas com 2 times não contam pontos." : marcados
+    h += '<p class="hint">' + (marcados
       ? "Contaram só os jogos marcados: 1 ponto por vitória para quem estava em quadra, sem bônus."
       : "Nenhum jogo foi marcado, então ninguém ganhou ponto.") + "</p>";
-    if (marcados && r.teams.length > 2) {
+    if (marcados) {
       h += '<div class="rank">' + r.teams.map(function (t, ti) { return ti; }).sort(function (a, b) { return v[b] - v[a] || a - b; }).map(function (ti) {
         return '<div class="rank-row"><span class="pos">+' + v[ti] + '</span><span class="who"><b>Time ' + (ti + 1) + " · " + plural(v[ti], "vitória", "vitórias") + "</b>" + esc(resumoTime(r, ti)) + "</span></div>";
       }).join("") + "</div>";
@@ -845,15 +855,16 @@ details.hist summary { cursor: pointer; font-weight: 600; }
   function secaoSemPontos(r) {
     var T = r.teams.length;
     if (T === 3) return secaoTres(r);
-    var h = '<section class="panel" aria-label="Encerrar rodada"><h2>Encerrar rodada</h2>';
+    var h = '<section class="panel" aria-label="Pontos da rodada"><h2>Pontos da rodada</h2>', marcado = r.winners.g1 !== undefined;
     if (r.closed) {
-      h += '<p class="hint">Rodada encerrada. Rodadas com 2 times não contam pontos.</p>';
+      if (marcado) h += resumoVitorias(r);
       h += '<button class="btn ball block" data-a="nova">Novo sorteio</button>';
       h += '<button class="btn ghost" data-a="reabrir">Corrigir resultado</button>';
       return h + "</section>";
     }
-    h += '<p class="hint">Rodadas com 2 times não contam pontos.</p>';
-    h += '<button class="btn primary block" data-a="fechar3">Encerrar rodada</button>';
+    h += '<p class="hint">Com 2 times, a vitória vale 1 ponto para quem estava em quadra.' + (marcado ? "" : " Marque o vencedor para encerrar.") + "</p>";
+    if (marcado) h += resumoVitorias(r);
+    h += '<button class="btn primary block" data-a="fechar3"' + (marcado ? "" : " disabled") + ">Confirmar e encerrar</button>";
     h += botoesRodadaAberta(r);
     h += '<button class="btn ghost" data-a="ask" data-s="cancel">Descartar este sorteio</button>';
     return h + "</section>";
@@ -921,7 +932,7 @@ details.hist summary { cursor: pointer; font-weight: 600; }
     var dentro = lista.filter(function (s) { return s.jogos >= MIN_JOGOS; }), entrando = lista.filter(function (s) { return s.jogos < MIN_JOGOS; });
     var h = '<section class="panel" aria-label="Pontuação"><h2>Classificação</h2>';
     h += '<p class="hint">Ordenada pela média de pontos por jogo, a mesma que o sorteio usa. Assim quem foi menos vezes não sai prejudicado. Entra na classificação quem tem pelo menos ' + MIN_JOGOS + ' jogos e jogou nos últimos 2 meses.</p>';
-    h += '<p class="hint">Cada vitória vale 1 ponto. Com 4 times, quem é do time campeão e ganhou os dois jogos leva +1 de bônus. Rodadas com 2 times não contam.</p>';
+    h += '<p class="hint">Cada vitória vale 1 ponto, com 2, 3 ou 4 times. Com 4 times, quem é do time campeão e ganhou os dois jogos leva +1 de bônus.</p>';
     if (!lista.length) {
       h += '<div class="empty"><span>' + (sumidos ? "Ninguém jogou nos últimos 2 meses. Os pontos antigos continuam guardados e voltam quando a pessoa jogar de novo."
         : "Ainda não tem pontos. Eles aparecem quando você confirma o resultado de uma rodada.") + "</span></div>";
@@ -1368,7 +1379,10 @@ details.hist summary { cursor: pointer; font-weight: 600; }
         var auto = rankingAutomatico(r);
         if (auto && !r.closed) fecharComRanking(r, auto);
         break;
-      case "fechar3": if (r && !r.closed && (r.teams.length !== 3 || tresCompletos(r))) { r.closed = true; aplicarPontos(r, 1); salvar(); } break;
+      case "fechar3":
+        var podeFechar = r && !r.closed && (r.teams.length === 3 ? tresCompletos(r) : r.teams.length === 2 ? r.winners.g1 !== undefined : true);
+        if (podeFechar) { r.closed = true; aplicarPontos(r, 1); salvar(); }
+        break;
       case "reabrir": if (r && r.closed) reabrir(r); break;
       case "parcial": ui.sheet = null; if (r && !r.closed) encerrarAgora(r); break;
       case "montar":
